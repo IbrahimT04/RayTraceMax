@@ -5,7 +5,7 @@ from scene_renderer import SceneRenderer
 
 
 class Window:
-    def __init__(self, scene: SceneRenderer, width: int = 1800, height: int = 1200, title: str = "My Window"):
+    def __init__(self, width: int = 1800, height: int = 1200, title: str = "My Window"):
         if not glfw.init():
             raise RuntimeError('glfw not initialized')
         self.window = glfw.create_window(width, height, title, None, None)
@@ -14,7 +14,7 @@ class Window:
             glfw.terminate()
             raise RuntimeError('glfw window not created')
 
-        glfw.set_window_size(self.window, width, height)
+        glfw.set_window_pos(self.window, 400, 200)
         glfw.set_window_size_callback(self.window, self.window_resize)
 
         self.update_context(self.window)
@@ -37,8 +37,10 @@ class Window:
     def get_inputs(self):
         glfw.poll_events()
 
-    def update_buffer(self):
+    def clear_buffer(self):
         glClear(GL_COLOR_BUFFER_BIT)
+
+    def swap_buffer(self):
         glfw.swap_buffers(self.window)
 
     def destroy(self):
