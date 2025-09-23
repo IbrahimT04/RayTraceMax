@@ -1,11 +1,12 @@
 from OpenGL.GL import *
 import glfw
 
-from scene_renderer import SceneRenderer
-
-
 class Window:
     def __init__(self, width: int = 1800, height: int = 1200, title: str = "My Window"):
+        self.width = width
+        self.height = height
+        self.title = title
+
         if not glfw.init():
             raise RuntimeError('glfw not initialized')
         self.window = glfw.create_window(width, height, title, None, None)
@@ -24,6 +25,9 @@ class Window:
     @staticmethod
     def window_resize(window, width, height):
         glViewport(0, 0, width, height)
+
+    def get_window_info(self):
+        return self.width, self.height, self.title
 
     def update_context(self, context=None):
         if context is None:
