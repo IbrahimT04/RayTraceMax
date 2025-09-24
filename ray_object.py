@@ -16,7 +16,7 @@ class RayTracer:
     def create_color_buffer(self):
 
         self.screenwidth, self.screenheight = RayTracer.info["window_info"][0], RayTracer.info["window_info"][1]
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, self.screenwidth, self.screenwidth, 0, GL_RGBA, GL_FLOAT, None)
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, self.screenwidth//8, self.screenheight//8, 0, GL_RGBA, GL_FLOAT, None)
 
     def draw(self):
         glUseProgram(self.comp_shaders)
