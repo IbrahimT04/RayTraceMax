@@ -6,16 +6,17 @@ class SceneRenderer:
     def __init__(self):
         self._objects = []
         self.info = {}
-        # GameObject.info = self.get_info()
+        GameObject.info = self.get_info()
         RayTracer.info = self.get_info()
-        # self.add_object(RayTracer())
-        # self.add_object(Quad())
 
     def add_object(self, obj):
         self._objects.append(obj)
 
     def input_info(self, input_name, input):
         self.info[input_name] = input
+
+    def ray_tracer(self):
+        pass
 
     def render(self):
         for obj in self._objects:

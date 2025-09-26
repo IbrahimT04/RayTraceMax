@@ -44,6 +44,9 @@ class Window:
     def clear_buffer(self):
         glClear(GL_COLOR_BUFFER_BIT)
 
+    def get_time(self):
+        return glfw.get_time()
+
     def swap_buffer(self):
         glfw.swap_buffers(self.window)
 
