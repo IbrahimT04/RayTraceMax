@@ -21,6 +21,9 @@ class GameObject:
         # Shader
         self.shader_program = calc_shaders(shader_program_name)
 
+    def pre_bake(self):
+        pass
+
     def destroy(self):
         glBindVertexArray(0)
         self.vao = None
@@ -119,3 +122,54 @@ class TexturedQuad(Quad):
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
         glBindVertexArray(0)
+
+class Cube(GameObject):
+    vertices = np.array([-0.5, -0.5,  0.5,      1.0, 0.0, 0.0,
+                             0.5, -0.5,  0.5,     0.0, 1.0, 0.0,
+                             0.5,  0.5,  0.5,     0.0, 0.0, 1.0,
+                            -0.5,  0.5,  0.5,     1.0, 1.0, 1.0,
+
+                            -0.5, -0.5, -0.5,    1.0, 0.0, 0.0,
+                             0.5, -0.5, -0.5,    0.0, 1.0, 0.0,
+                             0.5,  0.5, -0.5,    0.0, 0.0, 1.0,
+                            -0.5,  0.5, -0.5,    1.0, 1.0, 0.0],
+                        dtype=np.float32)
+
+    indices = np.array([0, 1, 2,        2, 3, 0,
+                            4, 5, 6,      6, 7, 4,
+                            4, 5, 1,      1, 0, 4,
+                            6, 7, 3,      3, 2, 6,
+                            5, 6, 2,      2, 1, 5,
+                            7, 4, 0,      0, 3, 7],
+                        dtype=np.uint32)
+
+    def __init__(self):
+        GameObject.__init__(self)
+
+        self.num_indices = len(self.indices)
+
+        glBindVertexArray(self.vao)
+
+        glBindBuffer(GL_ARRAY_BUFFER, self.vbos)
+        glBufferData(GL_ARRAY_BUFFER, self.vertices.nbytes, self.vertices, GL_STATIC_DRAW)
+
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, self.ebo)
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, self.indices.nbytes, self.indices, GL_STATIC_DRAW)
+
+        glEnableVertexAttribArray(0)
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 24, ctypes.c_void_p(0))
+
+        glEnableVertexAttribArray(1)
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 24, ctypes.c_void_p(12))
+
+        glBindVertexArray(0)
+
+    def draw(self):
+        glBindVertexArray(self.vao)
+        glUseProgram(self.shader_program)
+        glDrawElements(GL_TRIANGLES, self.num_indices, GL_UNSIGNED_INT, ctypes.c_void_p(0))
+
+    def destroy(self):
+        GameObject.destroy(self)
+        glBindBuffer(GL_ARRAY_BUFFER, 0)
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0)

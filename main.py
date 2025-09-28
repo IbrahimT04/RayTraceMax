@@ -8,8 +8,8 @@ class Main:
         self.sceneRenderer = SceneRenderer()
 
         self.sceneRenderer.input_info("window_info", self.window.get_window_info())
-        self.scene = Scene(self.sceneRenderer)
-
+        self.sceneRenderer.scene = Scene(self.sceneRenderer)
+        self.sceneRenderer.prebake()
     def main_loop(self):
         window = self.window
         scene = self.sceneRenderer
@@ -19,6 +19,7 @@ class Main:
             window.clear_buffer()
 
             scene.render()
+            # scene.ray_trace_render()
 
             window.swap_buffer()
 

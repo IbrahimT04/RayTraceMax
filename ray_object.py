@@ -18,7 +18,10 @@ class RayTracer:
         self.screenwidth, self.screenheight = RayTracer.info["window_info"][0], RayTracer.info["window_info"][1]
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, self.screenwidth, self.screenheight, 0, GL_RGBA, GL_FLOAT, None)
 
-    def draw(self):
+    def pre_bake(self):
+        pass
+
+    def ray_draw(self):
         glUseProgram(self.comp_shaders)
         glActiveTexture(GL_TEXTURE0)
         glBindImageTexture(0, self.quad_screen.texture, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F)
@@ -37,3 +40,20 @@ class RayTracer:
         self.quad_screen.destroy()
         self.quad_screen = None
 
+class RayObject:
+    def __init__(self, color, refraction_index):
+        self.color = np.array(color, dtype=np.float32)
+        self.refraction_index = refraction_index
+    def draw(self):
+        pass
+
+class MeshRayObject(RayObject):
+    pass
+
+class Sphere(RayObject):
+    def __init__(self, refraction_index: float, center: np.ndarray, radius: float, color: np.ndarray):
+        RayObject.__init__(self, color, refraction_index)
+        self.center = np.array(center,dtype=np.float32)
+        self.radius = radius
+    def destroy(self):
+        pass
