@@ -8,8 +8,9 @@ class Main:
         self.sceneRenderer = SceneRenderer()
 
         self.sceneRenderer.input_info("window_info", self.window.get_window_info())
-        self.sceneRenderer.scene = Scene(self.sceneRenderer)
         self.sceneRenderer.prebake()
+        self.sceneRenderer.scene = Scene(self.sceneRenderer)
+
     def main_loop(self):
         window = self.window
         scene = self.sceneRenderer

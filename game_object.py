@@ -6,6 +6,7 @@ from utilities import calc_shaders, get_textures
 
 class GameObject:
     info = {}
+    isRayObj = False
     def __init__(self, shader_program_name='default', num_buffers=1):
         # VAO
         self.vao = glGenVertexArrays(1)
@@ -20,9 +21,6 @@ class GameObject:
 
         # Shader
         self.shader_program = calc_shaders(shader_program_name)
-
-    def pre_bake(self):
-        pass
 
     def destroy(self):
         glBindVertexArray(0)

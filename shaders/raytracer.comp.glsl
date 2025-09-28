@@ -1,11 +1,5 @@
 #version 460
 
-struct Sphere {
-    vec3 center;
-    float radius;
-    vec3 color;
-};
-
 struct Camera {
     vec3 position;
     vec3 forwards;
@@ -17,6 +11,19 @@ struct Ray {
     vec3 origin;
     vec3 direction;
 };
+
+struct RenderState {
+    float t;
+    vec3 color;
+    bool hit;
+};
+
+struct Sphere {
+    vec3 center;
+    float radius;
+    vec3 color;
+};
+
 struct Plane {
     vec3 normal;
     vec3 color;
@@ -27,6 +34,133 @@ struct Plane {
 //input/output
 layout(local_size_x=8, local_size_y=8) in;
 layout(rgba32f, binding = 0) uniform image2D img_output;
+
+// Scene input data
+uniform Camera viewer;
+uniform Sphere spheres[32];
+uniform float sphere_count;
+
+// AABB (slab) intersection. Returns true if hit; outputs tHit and hit normal.
+bool intersectAABB(in vec3 ro, in vec3 rd, in vec3 bmin, in vec3 bmax, out float tHit, out vec3 outNormal);
+
+vec3 ray_color(Ray ray);
+
+RenderState hit(Ray ray, Sphere sphere, float tMin, float tMax, RenderState renderstate);
+
+void main() {
+    ivec2 pixel_coords = ivec2(gl_GlobalInvocationID);
+    ivec2 screen_size = imageSize(img_output);
+    float horizontalCoefficient = ((float(pixel_coords.x) * 2 - screen_size.x) / screen_size.x);
+    float verticalCoefficient   = ((float(pixel_coords.y) * 2 - screen_size.y) / screen_size.x);
+
+    Ray ray;
+    ray.origin = viewer.position;
+    ray.direction = viewer.forwards + horizontalCoefficient * viewer.right + verticalCoefficient * viewer.up;
+
+    vec3 pixel = ray_color(ray);
+
+    /*
+    // ---------- Cube (AABB) ----------
+    // Define cube center and half-size (a cube is an AABB here)
+    vec3 cubeCenter = vec3(6.0, 3.0, 2.0);
+    float halfSize = 1.0;
+    vec3 bmin = cubeCenter - vec3(halfSize);
+    vec3 bmax = cubeCenter + vec3(halfSize);
+
+    float tHit;
+    vec3 hitNormal;
+    bool hit = intersectAABB(ray.origin, ray.direction, bmin, bmax, tHit, hitNormal);
+
+    if (hit) {
+        // Simple face coloring: map normal -> color so faces are visibly different
+        // (normal is in {-1,0,1}, shifting to [0,1] gives distinct colors per face)
+        pixel = hitNormal * 0.5 + 0.5;
+
+        // Optional: simple Lambert-like shading with a fixed light direction to add depth
+        vec3 lightDir = normalize(vec3(-1.0, -1.0, -0.5));
+        float diff = max(0.0, dot(normalize(hitNormal), lightDir));
+        float ambient = 0.2;
+        pixel = pixel * (ambient + 0.8 * diff);
+    } else {
+        // background color when cube not hit
+        pixel = vec3(0.0); // black
+    }
+    */
+
+
+    /*
+    // Ray Trace Sphere
+    // Quadratic Parameters x = (-b +- sqrt(b^2-4ac))/2a
+    float a = dot(ray.direction, ray.direction);
+    float b = 2.0 * dot(ray.direction, ray.origin - sphere.center);
+    float c = dot(ray.origin - sphere.center, ray.origin - sphere.center) - sphere.radius * sphere.radius;
+
+    float discriminant = b * b - 4 * a * c;
+
+    if (discriminant > 0){
+        pixel += sphere.color;
+    }
+
+
+    // Ray Trace Plane
+    Plane plane;
+    plane.normal = vec3(0.0, 0.0, 1.0);
+    plane.height = -1.0;
+    plane.color = vec3(0.0, 0.0, 1.0);
+
+
+    float denominator = dot(plane.normal, ray.direction);
+    float t = (dot(plane.normal, ray.origin) + plane.height) / denominator;
+
+    if (t > 0 && !isinf(t)){
+        pixel += plane.color;
+    }
+    */
+    imageStore(img_output, pixel_coords, vec4(pixel, 1.0));
+}
+
+vec3 ray_color(Ray ray){
+    vec3 color = vec3(0.0);
+
+    float nearestHit = 9999999;
+    bool hitSomething = false;
+    RenderState renderstate;
+
+    for (int i = 0; i < sphere_count; i++){
+        renderstate = hit(ray, spheres[i], 0.001, nearestHit, renderstate);
+
+        if (renderstate.hit){
+            nearestHit = renderstate.t;
+            hitSomething = true;
+        }
+    }
+    if (hitSomething){
+        color = renderstate.color;
+    }
+    return color;
+}
+
+RenderState hit(Ray ray, Sphere sphere, float tMin, float tMax, RenderState renderstate){
+    vec3 dist = ray.origin - sphere.center;
+    float a = dot(ray.direction, ray.direction);
+    float b = 2.0 * dot(ray.direction, dist);
+    float c = dot(dist, dist) - sphere.radius * sphere.radius;
+
+    float discriminant = b * b - 4 * a * c;
+
+    if (discriminant > 0){
+        float t = (-b - sqrt(discriminant)) / (2 * a);
+
+        if (t > tMin && t < tMax){
+            renderstate.t = t;
+            renderstate.color = sphere.color;
+            renderstate.hit = true;
+            return renderstate;
+        }
+    }
+    renderstate.hit = false;
+    return renderstate;
+}
 
 // AABB (slab) intersection. Returns true if hit; outputs tHit and hit normal.
 bool intersectAABB(in vec3 ro, in vec3 rd, in vec3 bmin, in vec3 bmax, out float tHit, out vec3 outNormal) {
@@ -67,84 +201,4 @@ bool intersectAABB(in vec3 ro, in vec3 rd, in vec3 bmin, in vec3 bmax, out float
     else outNormal = vec3(0.0); // fallback (shouldn't usually happen)
 
     return true;
-}
-
-void main() {
-    ivec2 pixel_coords = ivec2(gl_GlobalInvocationID);
-    ivec2 screen_size = imageSize(img_output);
-    float horizontalCoefficient = ((float(pixel_coords.x) * 2 - screen_size.x) / screen_size.x);
-    float verticalCoefficient   = ((float(pixel_coords.y) * 2 - screen_size.y) / screen_size.x);
-
-    vec3 pixel = vec3(0.0);
-
-    Camera camera;
-    camera.position = vec3(0.0);
-    camera.forwards = vec3(1.0, 0.0, 0.0);
-    camera.right    = vec3(0.0, 1.0, 0.0);
-    camera.up       = vec3(0.0, 0.0, 1.0);
-
-    Sphere sphere;
-    sphere.center = vec3(5.0, -1.0, 0.0);
-    sphere.radius = 1.0;
-    sphere.color = vec3(1.0, 0.3, 0.7);
-
-    Plane plane;
-    plane.normal = vec3(0.0, 0.0, 1.0);
-    plane.height = -1.0;
-    plane.color = vec3(0.0, 0.0, 1.0);
-
-    Ray ray;
-    ray.origin = camera.position;
-    ray.direction = camera.forwards + horizontalCoefficient * camera.right + verticalCoefficient * camera.up;
-
-    // ---------- Cube (AABB) ----------
-    // Define cube center and half-size (a cube is an AABB here)
-    vec3 cubeCenter = vec3(6.0, 3.0, 2.0);
-    float halfSize = 1.0;
-    vec3 bmin = cubeCenter - vec3(halfSize);
-    vec3 bmax = cubeCenter + vec3(halfSize);
-
-    float tHit;
-    vec3 hitNormal;
-    bool hit = intersectAABB(ray.origin, ray.direction, bmin, bmax, tHit, hitNormal);
-
-    if (hit) {
-        // Simple face coloring: map normal -> color so faces are visibly different
-        // (normal is in {-1,0,1}, shifting to [0,1] gives distinct colors per face)
-        pixel = hitNormal * 0.5 + 0.5;
-
-        // Optional: simple Lambert-like shading with a fixed light direction to add depth
-        vec3 lightDir = normalize(vec3(-1.0, -1.0, -0.5));
-        float diff = max(0.0, dot(normalize(hitNormal), lightDir));
-        float ambient = 0.2;
-        pixel = pixel * (ambient + 0.8 * diff);
-    } else {
-        // background color when cube not hit
-        pixel = vec3(0.0); // black
-    }
-
-
-
-    // Ray Trace Sphere
-    // Quadratic Parameters x = (-b +- sqrt(b^2-4ac))/2a
-    float a = dot(ray.direction, ray.direction);
-    float b = 2.0 * dot(ray.direction, ray.origin - sphere.center);
-    float c = dot(ray.origin - sphere.center, ray.origin - sphere.center) - sphere.radius * sphere.radius;
-
-    float discriminant = b * b - 4 * a * c;
-
-    if (discriminant > 0){
-        pixel += sphere.color;
-    }
-
-
-    // Ray Trace Plane
-    float denominator = dot(plane.normal, ray.direction);
-    float t = (dot(plane.normal, ray.origin) + plane.height) / denominator;
-
-    if (t > 0 && !isinf(t)){
-        pixel += plane.color;
-    }
-
-    imageStore(img_output, pixel_coords, vec4(pixel, 1.0));
 }

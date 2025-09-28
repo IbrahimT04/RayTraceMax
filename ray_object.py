@@ -8,18 +8,33 @@ from utilities import calc_compute_shaders
 class RayTracer:
     info = {}
     def __init__(self, shader_program_name='raytracer'):
+        self.camera = None
         self.comp_shaders = calc_compute_shaders(shader_program_name)
         self.quad_screen = TexturedQuad(shader_program_name)
         self.screenwidth, self.screenheight = 0, 0
         self.create_color_buffer()
 
     def create_color_buffer(self):
-
         self.screenwidth, self.screenheight = RayTracer.info["window_info"][0], RayTracer.info["window_info"][1]
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, self.screenwidth, self.screenheight, 0, GL_RGBA, GL_FLOAT, None)
 
-    def pre_bake(self, obj: 'RayObject'):
-        pass
+    def add_camera(self, camera):
+        self.camera = camera
+
+    def prepare_scene(self, ray_objects):
+        glUseProgram(self.comp_shaders)
+        glUniform3fv(glGetUniformLocation(self.comp_shaders, "viewer.position"),1, self.camera.position)
+        glUniform3fv(glGetUniformLocation(self.comp_shaders, "viewer.forwards"),1, self.camera.forwards)
+        glUniform3fv(glGetUniformLocation(self.comp_shaders, "viewer.right"),1, self.camera.right)
+        glUniform3fv(glGetUniformLocation(self.comp_shaders, "viewer.up"),1, self.camera.up)
+
+        glUniform1f(glGetUniformLocation(self.comp_shaders, "sphere_count"), len(ray_objects))
+
+        for i, _sphere in enumerate(ray_objects):
+            # if _sphere.isRayObj:
+            glUniform3fv(glGetUniformLocation(self.comp_shaders, f"spheres[{i}].center"),1, _sphere.center)
+            glUniform1f(glGetUniformLocation(self.comp_shaders, f"spheres[{i}].radius"), _sphere.radius)
+            glUniform3fv(glGetUniformLocation(self.comp_shaders, f"spheres[{i}].color"),1, _sphere.color)
 
     def ray_draw(self):
         glUseProgram(self.comp_shaders)
@@ -41,6 +56,7 @@ class RayTracer:
         self.quad_screen = None
 
 class RayObject:
+    isRayObj = True
     def __init__(self, color, refraction_index):
         self.color = np.array(color, dtype=np.float32)
         self.refraction_index = refraction_index
