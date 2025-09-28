@@ -18,8 +18,8 @@ class Main:
 
             window.clear_buffer()
 
-            scene.render()
-            # scene.ray_trace_render()
+            # scene.render()
+            scene.ray_trace_render()
 
             window.swap_buffer()
 

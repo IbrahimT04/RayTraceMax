@@ -47,7 +47,7 @@ class SceneRenderer:
 class Scene:
     def __init__(self, scene_renderer: SceneRenderer):
         self.renderer = scene_renderer
-        # self.renderer.add_object(Cube())
+        self.renderer.add_object(Cube())
 
         self.spheres = [
             Sphere(

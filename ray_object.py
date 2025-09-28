@@ -18,7 +18,7 @@ class RayTracer:
         self.screenwidth, self.screenheight = RayTracer.info["window_info"][0], RayTracer.info["window_info"][1]
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, self.screenwidth, self.screenheight, 0, GL_RGBA, GL_FLOAT, None)
 
-    def pre_bake(self):
+    def pre_bake(self, obj: 'RayObject'):
         pass
 
     def ray_draw(self):
