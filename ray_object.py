@@ -8,18 +8,41 @@ from utilities import calc_compute_shaders
 class RayTracer:
     info = {}
     def __init__(self, shader_program_name='raytracer'):
+        self.sphereDataBuffer = None
+        self.sphereData = None
         self.camera = None
         self.comp_shaders = calc_compute_shaders(shader_program_name)
         self.quad_screen = TexturedQuad(shader_program_name)
         self.screenwidth, self.screenheight = 0, 0
         self.create_color_buffer()
+        self.create_resource_memory()
 
     def create_color_buffer(self):
         self.screenwidth, self.screenheight = RayTracer.info["window_info"][0], RayTracer.info["window_info"][1]
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, self.screenwidth, self.screenheight, 0, GL_RGBA, GL_FLOAT, None)
 
+    def create_resource_memory(self):
+        self.sphereData = np.zeros(1024 * 8, dtype=np.float32)
+
+        self.sphereDataBuffer = glGenBuffers(1)
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, self.sphereDataBuffer)
+
+        glBufferData(GL_SHADER_STORAGE_BUFFER, self.sphereData.nbytes, self.sphereData, GL_DYNAMIC_READ)
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, self.sphereDataBuffer)
+
     def add_camera(self, camera):
         self.camera = camera
+
+    def record_sphere(self, index, _sphere: 'Sphere'):
+        self.sphereData[8 * index    ] = _sphere.center[0]
+        self.sphereData[8 * index + 1] = _sphere.center[1]
+        self.sphereData[8 * index + 2] = _sphere.center[2]
+
+        self.sphereData[8 * index + 3] = _sphere.radius
+
+        self.sphereData[8 * index + 4] = _sphere.color[0]
+        self.sphereData[8 * index + 5] = _sphere.color[1]
+        self.sphereData[8 * index + 6] = _sphere.color[2]
 
     def prepare_scene(self, ray_objects):
         glUseProgram(self.comp_shaders)
@@ -32,9 +55,20 @@ class RayTracer:
 
         for i, _sphere in enumerate(ray_objects):
             # if _sphere.isRayObj:
+            """
             glUniform3fv(glGetUniformLocation(self.comp_shaders, f"spheres[{i}].center"),1, _sphere.center)
             glUniform1f(glGetUniformLocation(self.comp_shaders, f"spheres[{i}].radius"), _sphere.radius)
             glUniform3fv(glGetUniformLocation(self.comp_shaders, f"spheres[{i}].color"),1, _sphere.color)
+            """
+            self.record_sphere(i, _sphere)
+
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, self.sphereDataBuffer)
+        glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, 8 * 4 * len(ray_objects), self.sphereData)
+
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, self.sphereDataBuffer)
+
+
+
 
     def ray_draw(self):
         glUseProgram(self.comp_shaders)

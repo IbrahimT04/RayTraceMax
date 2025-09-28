@@ -22,6 +22,13 @@ class Window:
 
         glClearColor(0.3, 0.2, 0.3, 0.0)
 
+        # --- FPS tracking (minimal, non-breaking) ---
+        self._frame_count = 0
+        self._last_fps_time = glfw.get_time()
+        self._fps = 0.0
+        # update title every 0.5s by default; change if you want
+        self.fps_update_interval = 0.5
+
     @staticmethod
     def window_resize(window, width, height):
         glViewport(0, 0, width, height)
@@ -49,6 +56,22 @@ class Window:
 
     def swap_buffer(self):
         glfw.swap_buffers(self.window)
+
+        # --- FPS counting / title update ---
+        self._frame_count += 1
+        now = glfw.get_time()
+        elapsed = now - self._last_fps_time
+        if elapsed >= self.fps_update_interval:
+            self._fps = self._frame_count / elapsed if elapsed > 0 else 0.0
+            fps_title = f"{self.title} - {self._fps:.1f} FPS"
+            glfw.set_window_title(self.window, fps_title)
+
+            # reset counters
+            self._frame_count = 0
+            self._last_fps_time = now
+
+    def get_fps(self):
+        return self._fps
 
     def destroy(self):
         glfw.terminate()

@@ -37,7 +37,10 @@ layout(rgba32f, binding = 0) uniform image2D img_output;
 
 // Scene input data
 uniform Camera viewer;
-uniform Sphere spheres[32];
+// uniform Sphere spheres[32];
+layout(std430, binding = 1) readonly buffer sceneData{
+    Sphere[] spheres;
+};
 uniform float sphere_count;
 
 // AABB (slab) intersection. Returns true if hit; outputs tHit and hit normal.
