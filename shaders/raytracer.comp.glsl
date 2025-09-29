@@ -24,10 +24,10 @@ struct Sphere {
     vec3 color;
 };
 
-struct Plane {
+struct InfPlane {
     vec3 normal;
     vec3 color;
-    float height;
+    vec3 center;
 };
 
 
@@ -106,14 +106,14 @@ void main() {
 
 
     // Ray Trace Plane
-    Plane plane;
-    plane.normal = vec3(0.0, 0.0, 1.0);
-    plane.height = -1.0;
-    plane.color = vec3(0.0, 0.0, 1.0);
+    InfPlane plane;
+    InfPlane.normal = vec3(0.0, 0.0, 1.0);
+    InfPlane.center = vec3(0.0,0.0,-1.0;
+    InfPlane.color = vec3(0.0, 0.0, 1.0);
 
 
     float denominator = dot(plane.normal, ray.direction);
-    float t = (dot(plane.normal, ray.origin) + plane.height) / denominator;
+    float t = (dot(plane.normal, ray.origin)) / denominator;
 
     if (t > 0 && !isinf(t)){
         pixel += plane.color;

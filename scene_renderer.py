@@ -2,7 +2,7 @@ import numpy as np
 
 import camera
 from game_object import GameObject, Quad, Cube
-from ray_object import RayTracer, Sphere
+from ray_object import RayTracer, Sphere, Plane
 
 
 class SceneRenderer:
@@ -19,6 +19,10 @@ class SceneRenderer:
     def add_camera(self, cam: camera.Camera):
         self.camera = cam
         self.rayTracer.add_camera(cam)
+
+    """def update_camera(self, cam: camera.Camera):
+        self.rayTracer = self.rayTracer.update_camera(cam)
+        pass"""
 
     def add_object(self, obj):
         if obj.isRayObj:
@@ -49,7 +53,11 @@ class SceneRenderer:
 
 
 class Scene:
-    def __init__(self, scene_renderer: SceneRenderer):
+    def __init__(self, scene_renderer: SceneRenderer, window):
+
+        # Need to add this functionality
+        self.outDated = True
+
         self.renderer = scene_renderer
         self.renderer.add_object(Cube())
 
@@ -67,11 +75,33 @@ class Scene:
                     np.random.uniform(low=0.3, high=1.0),
                     np.random.uniform(low=0.3, high=1.0)
                 ]
-            ) for _ in range(1024)
+            ) for _ in range(32)
         ]
+
+        """self.planes = [
+            Plane(
+                refraction_index=np.random.uniform(low=0.9, high=1.1),
+                normal=[0, 0, 1],
+                tangent=[1, 0, 0],
+                bitangent=[0, 1, 0],
+                u_min=-10,
+                u_max=10,
+                v_min=-10,
+                v_max=10,
+                center=[0, 0, -7],
+                color=[
+                    np.random.uniform(low=0.3, high=1.0),
+                    np.random.uniform(low=0.3, high=1.0),
+                    np.random.uniform(low=0.3, high=1.0)
+                ]
+            ),
+        ]"""
+
         self.camera = camera.Camera(
-            position=[0, 0, 0]
+            position=[-10, 0, 0]
         )
         self.renderer.add_camera(self.camera)
         for sphere in self.spheres:
             self.renderer.add_object(sphere)
+
+        window.attach_camera(self.camera)

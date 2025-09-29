@@ -30,8 +30,8 @@ class RayTracer:
         glBufferData(GL_SHADER_STORAGE_BUFFER, self.sphereData.nbytes, self.sphereData, GL_DYNAMIC_READ)
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, self.sphereDataBuffer)
 
-    def add_camera(self, camera):
-        self.camera = camera
+    def add_camera(self, cam):
+        self.camera = cam
 
     def record_sphere(self, index, _sphere: 'Sphere'):
         self.sphereData[8 * index    ] = _sphere.center[0]
@@ -54,12 +54,6 @@ class RayTracer:
         glUniform1f(glGetUniformLocation(self.comp_shaders, "sphere_count"), len(ray_objects))
 
         for i, _sphere in enumerate(ray_objects):
-            # if _sphere.isRayObj:
-            """
-            glUniform3fv(glGetUniformLocation(self.comp_shaders, f"spheres[{i}].center"),1, _sphere.center)
-            glUniform1f(glGetUniformLocation(self.comp_shaders, f"spheres[{i}].radius"), _sphere.radius)
-            glUniform3fv(glGetUniformLocation(self.comp_shaders, f"spheres[{i}].color"),1, _sphere.color)
-            """
             self.record_sphere(i, _sphere)
 
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, self.sphereDataBuffer)
@@ -91,19 +85,45 @@ class RayTracer:
 
 class RayObject:
     isRayObj = True
-    def __init__(self, color, refraction_index):
+    def __init__(self, color: np.ndarray, refraction_index: float, smoothness=1):
         self.color = np.array(color, dtype=np.float32)
         self.refraction_index = refraction_index
+        self.smoothness = smoothness
     def draw(self):
         pass
 
+
 class MeshRayObject(RayObject):
     pass
+
 
 class Sphere(RayObject):
     def __init__(self, refraction_index: float, center: np.ndarray, radius: float, color: np.ndarray):
         RayObject.__init__(self, color, refraction_index)
         self.center = np.array(center,dtype=np.float32)
         self.radius = radius
+    def destroy(self):
+        pass
+
+
+class InfPlane(RayObject):
+    def __init__(self, refraction_index: float, normal: np.ndarray, center: np.ndarray, color: np.ndarray):
+        super().__init__(color, refraction_index)
+        self.normal = np.array(normal, dtype=np.float32)
+        self.center = np.array(center, dtype=np.float32)
+    def destroy(self):
+        pass
+
+
+class Plane(InfPlane):
+    def __init__(self, refraction_index: float, normal: np.ndarray, tangent: np.ndarray, bitangent: np.ndarray,
+                 center: np.ndarray, color: np.ndarray, u_min: float, u_max: float, v_min: float, v_max: float):
+        super().__init__(refraction_index, normal, center, color)
+        self.tangent = np.array(tangent, dtype=np.float32)
+        self.bitangent = np.array(bitangent, dtype=np.float32)
+        self.uMin = u_min
+        self.uMax = u_max
+        self.vMin = v_min
+        self.vMax = v_max
     def destroy(self):
         pass
