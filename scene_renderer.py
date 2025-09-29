@@ -11,7 +11,7 @@ class SceneRenderer:
         self.rayTracer = None
         self.scene = None
         self._objects = []
-        self._ray_objects = []
+        # self._ray_objects = []
         self.info = {}
         GameObject.info = self.get_info()
         RayTracer.info = self.get_info()
@@ -26,7 +26,7 @@ class SceneRenderer:
 
     def add_object(self, obj):
         if obj.isRayObj:
-            self._ray_objects.append(obj)
+            self.rayTracer.add_object(obj)
         else:
             self._objects.append(obj)
 
@@ -48,7 +48,7 @@ class SceneRenderer:
             obj.destroy()
 
     def ray_trace_render(self):
-        self.rayTracer.prepare_scene(self._ray_objects)
+        self.rayTracer.prepare_scene()
         self.rayTracer.ray_draw()
 
 

@@ -16,7 +16,15 @@ class RayTracer:
         self.screenwidth, self.screenheight = 0, 0
         self.create_color_buffer()
         self.create_resource_memory()
+        self.sphere_objects = []
+        self.plane_objects = []
 
+    def add_object(self, ray_object: 'RayObject'):
+        if isinstance(ray_object, Sphere):
+            self.sphere_objects.append(ray_object)
+        else :
+            self.plane_objects.append(ray_object)
+        pass
     def create_color_buffer(self):
         self.screenwidth, self.screenheight = RayTracer.info["window_info"][0], RayTracer.info["window_info"][1]
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, self.screenwidth, self.screenheight, 0, GL_RGBA, GL_FLOAT, None)
@@ -44,20 +52,22 @@ class RayTracer:
         self.sphereData[8 * index + 5] = _sphere.color[1]
         self.sphereData[8 * index + 6] = _sphere.color[2]
 
-    def prepare_scene(self, ray_objects):
+    def prepare_scene(self):
+        spheres = self.sphere_objects
+
         glUseProgram(self.comp_shaders)
         glUniform3fv(glGetUniformLocation(self.comp_shaders, "viewer.position"),1, self.camera.position)
         glUniform3fv(glGetUniformLocation(self.comp_shaders, "viewer.forwards"),1, self.camera.forwards)
         glUniform3fv(glGetUniformLocation(self.comp_shaders, "viewer.right"),1, self.camera.right)
         glUniform3fv(glGetUniformLocation(self.comp_shaders, "viewer.up"),1, self.camera.up)
 
-        glUniform1f(glGetUniformLocation(self.comp_shaders, "sphere_count"), len(ray_objects))
+        glUniform1f(glGetUniformLocation(self.comp_shaders, "sphere_count"), len(spheres))
 
-        for i, _sphere in enumerate(ray_objects):
+        for i, _sphere in enumerate(spheres):
             self.record_sphere(i, _sphere)
 
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, self.sphereDataBuffer)
-        glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, 8 * 4 * len(ray_objects), self.sphereData)
+        glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, 8 * 4 * len(spheres), self.sphereData)
 
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, self.sphereDataBuffer)
 
