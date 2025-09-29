@@ -86,7 +86,7 @@ void main() {
         pixel = pixel * (ambient + 0.8 * diff);
     } else {
         // background color when cube not hit
-        pixel = vec3(0.0); // black
+        pixel += vec3(0.0); // black
     }
     */
 
@@ -104,19 +104,22 @@ void main() {
         pixel += sphere.color;
     }
 
-
+    */
+    /*
     // Ray Trace Plane
     InfPlane plane;
-    InfPlane.normal = vec3(0.0, 0.0, 1.0);
-    InfPlane.center = vec3(0.0,0.0,-1.0;
-    InfPlane.color = vec3(0.0, 0.0, 1.0);
+    plane.normal = vec3(0.0, 0.0, 1.0);
+    plane.center = vec3(0.0, 0.0,-6.0);
+    plane.color = vec3(0.0, 0.0, 1.0);
 
 
     float denominator = dot(plane.normal, ray.direction);
-    float t = (dot(plane.normal, ray.origin)) / denominator;
 
-    if (t > 0 && !isinf(t)){
-        pixel += plane.color;
+    if (denominator != 0){
+        float t = (dot(plane.normal, ray.origin)- plane.center[2]) / denominator;
+        if (t < 0){
+            pixel += plane.color;
+        }
     }
     */
     imageStore(img_output, pixel_coords, vec4(pixel, 1.0));
