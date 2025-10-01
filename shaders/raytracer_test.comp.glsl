@@ -200,7 +200,7 @@ RenderState hit(Ray ray, Sphere sphere, float tMin, float tMax, RenderState rend
 RenderState hit(Ray ray, Plane plane, float tMin, float tMax, RenderState renderstate){
     float denominator = dot(plane.normal, ray.direction);
 
-    if (abs(denominator) > 0.00001) {
+    if (denominator < 0.00001) {
 
         float t = dot(plane.center - ray.origin, plane.normal) / denominator;
 

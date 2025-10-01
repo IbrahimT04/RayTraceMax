@@ -8,29 +8,42 @@ from utilities import calc_compute_shaders
 class RayTracer:
     info = {}
     def __init__(self, shader_program_name='raytracer'):
+        self.spheresNeedUpdate = True
+        self.planesNeedUpdate = True
+
+        self.planeDataBuffer = None
+        self.planeData = None
+
         self.sphereDataBuffer = None
         self.sphereData = None
+
         self.camera = None
+
         self.comp_shaders = calc_compute_shaders(shader_program_name)
         self.quad_screen = TexturedQuad(shader_program_name)
+
         self.screenwidth, self.screenheight = 0, 0
         self.create_color_buffer()
         self.create_resource_memory()
+
         self.sphere_objects = []
         self.plane_objects = []
 
     def add_object(self, ray_object: 'RayObject'):
         if isinstance(ray_object, Sphere):
             self.sphere_objects.append(ray_object)
+            self.spheresNeedUpdate = True
         else :
             self.plane_objects.append(ray_object)
-        pass
+            self.planesNeedUpdate = True
+
     def create_color_buffer(self):
         self.screenwidth, self.screenheight = RayTracer.info["window_info"][0], RayTracer.info["window_info"][1]
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, self.screenwidth, self.screenheight, 0, GL_RGBA, GL_FLOAT, None)
 
     def create_resource_memory(self):
-        self.sphereData = np.zeros(1024 * 8, dtype=np.float32)
+        # Sphere Data Allocation
+        self.sphereData = np.zeros(8192 * 8, dtype=np.float32)
 
         self.sphereDataBuffer = glGenBuffers(1)
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, self.sphereDataBuffer)
@@ -38,10 +51,20 @@ class RayTracer:
         glBufferData(GL_SHADER_STORAGE_BUFFER, self.sphereData.nbytes, self.sphereData, GL_DYNAMIC_READ)
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, self.sphereDataBuffer)
 
+        # Plane Data Allocation
+        self.planeData = np.zeros(8192 * 20, dtype=np.float32)
+
+        self.planeDataBuffer = glGenBuffers(1)
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, self.planeDataBuffer)
+
+        glBufferData(GL_SHADER_STORAGE_BUFFER, self.planeData.nbytes, self.planeData, GL_DYNAMIC_READ)
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, self.planeDataBuffer)
+
     def add_camera(self, cam):
         self.camera = cam
 
     def record_sphere(self, index, _sphere: 'Sphere'):
+        self.spheresNeedUpdate = False
         self.sphereData[8 * index    ] = _sphere.center[0]
         self.sphereData[8 * index + 1] = _sphere.center[1]
         self.sphereData[8 * index + 2] = _sphere.center[2]
@@ -52,8 +75,37 @@ class RayTracer:
         self.sphereData[8 * index + 5] = _sphere.color[1]
         self.sphereData[8 * index + 6] = _sphere.color[2]
 
+    def record_plane(self, index, _plane: 'Plane'):
+        self.planesNeedUpdate = False
+        self.planeData[20 * index     ] = _plane.center[0]
+        self.planeData[20 * index + 1 ] = _plane.center[1]
+        self.planeData[20 * index + 2 ] = _plane.center[2]
+
+        self.planeData[20 * index + 3 ] = _plane.uMin
+
+        self.planeData[20 * index + 4 ] = _plane.tangent[0]
+        self.planeData[20 * index + 5 ] = _plane.tangent[1]
+        self.planeData[20 * index + 6 ] = _plane.tangent[2]
+
+        self.planeData[20 * index + 7 ] = _plane.uMax
+
+        self.planeData[20 * index + 8 ] = _plane.bitangent[0]
+        self.planeData[20 * index + 9 ] = _plane.bitangent[1]
+        self.planeData[20 * index + 10] = _plane.bitangent[2]
+
+        self.planeData[20 * index + 11] = _plane.vMin
+
+        self.planeData[20 * index + 12] = _plane.normal[0]
+        self.planeData[20 * index + 13] = _plane.normal[1]
+        self.planeData[20 * index + 14] = _plane.normal[2]
+
+        self.planeData[20 * index + 15] = _plane.vMax
+
+        self.planeData[20 * index + 16] = _plane.color[0]
+        self.planeData[20 * index + 17] = _plane.color[1]
+        self.planeData[20 * index + 18] = _plane.color[2]
+
     def prepare_scene(self):
-        spheres = self.sphere_objects
 
         glUseProgram(self.comp_shaders)
         glUniform3fv(glGetUniformLocation(self.comp_shaders, "viewer.position"),1, self.camera.position)
@@ -61,18 +113,31 @@ class RayTracer:
         glUniform3fv(glGetUniformLocation(self.comp_shaders, "viewer.right"),1, self.camera.right)
         glUniform3fv(glGetUniformLocation(self.comp_shaders, "viewer.up"),1, self.camera.up)
 
-        glUniform1f(glGetUniformLocation(self.comp_shaders, "sphere_count"), len(spheres))
+        if self.spheresNeedUpdate:
+            # Spheres Update
+            spheres = self.sphere_objects
+            glUniform1f(glGetUniformLocation(self.comp_shaders, "sphere_count"), len(spheres))
 
-        for i, _sphere in enumerate(spheres):
-            self.record_sphere(i, _sphere)
+            for i, _sphere in enumerate(spheres):
+                self.record_sphere(i, _sphere)
 
-        glBindBuffer(GL_SHADER_STORAGE_BUFFER, self.sphereDataBuffer)
-        glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, 8 * 4 * len(spheres), self.sphereData)
+            glBindBuffer(GL_SHADER_STORAGE_BUFFER, self.sphereDataBuffer)
+            glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, 8 * 4 * len(spheres), self.sphereData)
 
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, self.sphereDataBuffer)
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, self.sphereDataBuffer)
 
+        if self.planesNeedUpdate:
+            # Planes Update
+            planes = self.plane_objects
+            glUniform1f(glGetUniformLocation(self.comp_shaders, "plane_count"), len(planes))
 
+            for i, _plane in enumerate(planes):
+                self.record_plane(i, _plane)
 
+            glBindBuffer(GL_SHADER_STORAGE_BUFFER, self.planeDataBuffer)
+            glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, 19 * 4 * len(planes), self.planeData)
+
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, self.planeDataBuffer)
 
     def ray_draw(self):
         glUseProgram(self.comp_shaders)

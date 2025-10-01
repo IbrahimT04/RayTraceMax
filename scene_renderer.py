@@ -20,10 +20,6 @@ class SceneRenderer:
         self.camera = cam
         self.rayTracer.add_camera(cam)
 
-    """def update_camera(self, cam: camera.Camera):
-        self.rayTracer = self.rayTracer.update_camera(cam)
-        pass"""
-
     def add_object(self, obj):
         if obj.isRayObj:
             self.rayTracer.add_object(obj)
@@ -59,7 +55,6 @@ class Scene:
         self.outDated = True
 
         self.renderer = scene_renderer
-        self.renderer.add_object(Cube())
 
         self.spheres = [
             Sphere(
@@ -78,7 +73,7 @@ class Scene:
             ) for _ in range(32)
         ]
 
-        """self.planes = [
+        self.planes = [
             Plane(
                 refraction_index=np.random.uniform(low=0.9, high=1.1),
                 normal=[0, 0, 1],
@@ -88,14 +83,14 @@ class Scene:
                 u_max=10,
                 v_min=-10,
                 v_max=10,
-                center=[0, 0, -7],
+                center=[0, 0, -3],
                 color=[
                     np.random.uniform(low=0.3, high=1.0),
                     np.random.uniform(low=0.3, high=1.0),
                     np.random.uniform(low=0.3, high=1.0)
                 ]
             ),
-        ]"""
+        ]
 
         self.camera = camera.Camera(
             position=[-10, 0, 0]
@@ -103,5 +98,8 @@ class Scene:
         self.renderer.add_camera(self.camera)
         for sphere in self.spheres:
             self.renderer.add_object(sphere)
+
+        for plane in self.planes:
+            self.renderer.add_object(plane)
 
         window.attach_camera(self.camera)
