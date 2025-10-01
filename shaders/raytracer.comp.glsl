@@ -16,6 +16,8 @@ struct RenderState {
     float t;
     vec3 color;
     bool hit;
+    vec3 position;
+    vec3 normal;
 };
 
 struct Sphere {
@@ -63,7 +65,7 @@ uniform float plane_count;
 // AABB (slab) intersection. Returns true if hit; outputs tHit and hit normal.
 bool intersectAABB(in vec3 ro, in vec3 rd, in vec3 bmin, in vec3 bmax, out float tHit, out vec3 outNormal);
 
-vec3 ray_color(Ray ray);
+RenderState trace(Ray ray);
 
 RenderState hit(Ray ray, Sphere sphere, float tMin, float tMax, RenderState renderstate);
 RenderState hit(Ray ray, Plane plane, float tMin, float tMax, RenderState renderstate);
@@ -78,101 +80,49 @@ void main() {
     ray.origin = viewer.position;
     ray.direction = viewer.forwards + horizontalCoefficient * viewer.right + verticalCoefficient * viewer.up;
 
-    vec3 pixel = ray_color(ray);
+    // vec3 pixel = trace(ray);
+    vec3 pixel = vec3(1.0);
 
-    /*
-    // ---------- Cube (AABB) ----------
-    // Define cube center and half-size (a cube is an AABB here)
-    vec3 cubeCenter = vec3(6.0, 3.0, 2.0);
-    float halfSize = 1.0;
-    vec3 bmin = cubeCenter - vec3(halfSize);
-    vec3 bmax = cubeCenter + vec3(halfSize);
+    for (int i = 0; i < 6; i++){
 
-    float tHit;
-    vec3 hitNormal;
-    bool hit = intersectAABB(ray.origin, ray.direction, bmin, bmax, tHit, hitNormal);
-
-    if (hit) {
-        // Simple face coloring: map normal -> color so faces are visibly different
-        // (normal is in {-1,0,1}, shifting to [0,1] gives distinct colors per face)
-        pixel = hitNormal * 0.5 + 0.5;
-
-        // Optional: simple Lambert-like shading with a fixed light direction to add depth
-        vec3 lightDir = normalize(vec3(-1.0, -1.0, -0.5));
-        float diff = max(0.0, dot(normalize(hitNormal), lightDir));
-        float ambient = 0.2;
-        pixel = pixel * (ambient + 0.8 * diff);
-    } else {
-        // background color when cube not hit
-        pixel += vec3(0.0); // black
-    }
-    */
-
-
-    /*
-    // Ray Trace Sphere
-    // Quadratic Parameters x = (-b +- sqrt(b^2-4ac))/2a
-    float a = dot(ray.direction, ray.direction);
-    float b = 2.0 * dot(ray.direction, ray.origin - sphere.center);
-    float c = dot(ray.origin - sphere.center, ray.origin - sphere.center) - sphere.radius * sphere.radius;
-
-    float discriminant = b * b - 4 * a * c;
-
-    if (discriminant > 0){
-        pixel += sphere.color;
-    }
-
-    */
-    /*
-    // Ray Trace Plane
-    InfPlane plane;
-    plane.normal = vec3(0.0, 0.0, 1.0);
-    plane.center = vec3(0.0, 0.0,-6.0);
-    plane.color = vec3(0.0, 0.0, 1.0);
-
-
-    float denominator = dot(plane.normal, ray.direction);
-
-    if (denominator != 0){
-        float t = (dot(plane.normal, ray.origin)- plane.center[2]) / denominator;
-        if (t < 0){
-            pixel += plane.color;
+        RenderState renderState = trace(ray);
+        if (!renderState.hit){
+            break;
         }
+        pixel = pixel * renderState.color;
+
+        ray.origin = renderState.position;
+        ray.direction = reflect(ray.direction, renderState.normal);
     }
-    */
+
     imageStore(img_output, pixel_coords, vec4(pixel, 1.0));
 }
 
-vec3 ray_color(Ray ray){
-    vec3 color = vec3(0.0);
+RenderState trace(Ray ray){
 
     float nearestHit = 9999999;
-    bool hitSomething = false;
-    RenderState renderstate;
+    RenderState renderState;
+    renderState.hit = false;
 
     for (int i = 0; i < sphere_count; i++){
-        renderstate = hit(ray, spheres[i], 0.001, nearestHit, renderstate);
+        RenderState newRenderState = hit(ray, spheres[i], 0.001, nearestHit, renderState);
 
-        if (renderstate.hit){
-            nearestHit = renderstate.t;
-            hitSomething = true;
+        if (newRenderState.hit){
+            nearestHit = newRenderState.t;
+            renderState = newRenderState;
         }
     }
 
     for (int i = 0; i < plane_count; i++){
-        renderstate = hit(ray, planes[i], 0.001, nearestHit, renderstate);
+        RenderState newRenderState = hit(ray, planes[i], 0.001, nearestHit, renderState);
 
-        if (renderstate.hit){
-            nearestHit = renderstate.t;
-            hitSomething = true;
+        if (newRenderState.hit){
+            nearestHit = newRenderState.t;
+            renderState = newRenderState;
         }
     }
 
-    if (hitSomething){
-        color = renderstate.color;
-    }
-
-    return color;
+    return renderState;
 }
 
 RenderState hit(Ray ray, Sphere sphere, float tMin, float tMax, RenderState renderstate){
@@ -187,6 +137,9 @@ RenderState hit(Ray ray, Sphere sphere, float tMin, float tMax, RenderState rend
         float t = (-b - sqrt(discriminant)) / (2 * a);
 
         if (t > tMin && t < tMax){
+
+            renderstate.position = ray.origin + t * ray.direction;
+            renderstate.normal = normalize(renderstate.position - sphere.center);
             renderstate.t = t;
             renderstate.color = sphere.color;
             renderstate.hit = true;
@@ -213,6 +166,8 @@ RenderState hit(Ray ray, Plane plane, float tMin, float tMax, RenderState render
             float v_vec = dot(plane_dir, plane.bitangent);
 
             if (u_vec > plane.uMin && u_vec < plane.uMax && v_vec > plane.vMin && v_vec < plane.vMax) {
+                renderstate.position = point;
+                renderstate.normal = plane.normal;
                 renderstate.t = t;
                 renderstate.color = plane.color;
                 renderstate.hit = true;

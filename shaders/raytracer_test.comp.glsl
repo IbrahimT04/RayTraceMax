@@ -200,7 +200,7 @@ RenderState hit(Ray ray, Sphere sphere, float tMin, float tMax, RenderState rend
 RenderState hit(Ray ray, Plane plane, float tMin, float tMax, RenderState renderstate){
     float denominator = dot(plane.normal, ray.direction);
 
-    if (denominator < 0.00001) {
+    if (abs(denominator) > 0.00001) {
 
         float t = dot(plane.center - ray.origin, plane.normal) / denominator;
 
@@ -265,3 +265,67 @@ bool intersectAABB(in vec3 ro, in vec3 rd, in vec3 bmin, in vec3 bmax, out float
 
     return true;
 }
+
+
+/*
+
+    Moved from main method for testing
+    // ---------- Cube (AABB) ----------
+    // Define cube center and half-size (a cube is an AABB here)
+    vec3 cubeCenter = vec3(6.0, 3.0, 2.0);
+    float halfSize = 1.0;
+    vec3 bmin = cubeCenter - vec3(halfSize);
+    vec3 bmax = cubeCenter + vec3(halfSize);
+
+    float tHit;
+    vec3 hitNormal;
+    bool hit = intersectAABB(ray.origin, ray.direction, bmin, bmax, tHit, hitNormal);
+
+    if (hit) {
+        // Simple face coloring: map normal -> color so faces are visibly different
+        // (normal is in {-1,0,1}, shifting to [0,1] gives distinct colors per face)
+        pixel = hitNormal * 0.5 + 0.5;
+
+        // Optional: simple Lambert-like shading with a fixed light direction to add depth
+        vec3 lightDir = normalize(vec3(-1.0, -1.0, -0.5));
+        float diff = max(0.0, dot(normalize(hitNormal), lightDir));
+        float ambient = 0.2;
+        pixel = pixel * (ambient + 0.8 * diff);
+    } else {
+        // background color when cube not hit
+        pixel += vec3(0.0); // black
+    }
+    */
+
+
+    /*
+    // Ray Trace Sphere
+    // Quadratic Parameters x = (-b +- sqrt(b^2-4ac))/2a
+    float a = dot(ray.direction, ray.direction);
+    float b = 2.0 * dot(ray.direction, ray.origin - sphere.center);
+    float c = dot(ray.origin - sphere.center, ray.origin - sphere.center) - sphere.radius * sphere.radius;
+
+    float discriminant = b * b - 4 * a * c;
+
+    if (discriminant > 0){
+        pixel += sphere.color;
+    }
+
+    */
+    /*
+    // Ray Trace Plane
+    InfPlane plane;
+    plane.normal = vec3(0.0, 0.0, 1.0);
+    plane.center = vec3(0.0, 0.0,-6.0);
+    plane.color = vec3(0.0, 0.0, 1.0);
+
+
+    float denominator = dot(plane.normal, ray.direction);
+
+    if (denominator != 0){
+        float t = (dot(plane.normal, ray.origin)- plane.center[2]) / denominator;
+        if (t < 0){
+            pixel += plane.color;
+        }
+    }
+    */
