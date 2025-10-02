@@ -11,7 +11,6 @@ class SceneRenderer:
         self.rayTracer = None
         self.scene = None
         self._objects = []
-        # self._ray_objects = []
         self.info = {}
         GameObject.info = self.get_info()
         RayTracer.info = self.get_info()
@@ -83,7 +82,7 @@ class Scene:
                 u_max=10,
                 v_min=-10,
                 v_max=10,
-                center=[0, 0, -3],
+                center=[0, 0, -8],
                 color=[
                     np.random.uniform(low=0.3, high=1.0),
                     np.random.uniform(low=0.3, high=1.0),
