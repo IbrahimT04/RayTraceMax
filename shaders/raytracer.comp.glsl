@@ -7,6 +7,12 @@ struct Camera {
     vec3 up;
 };
 
+struct Light {
+    vec3 position;
+    vec3 color;
+    float strenght;
+};
+
 struct Ray {
     vec3 origin;
     vec3 direction;
@@ -51,7 +57,7 @@ layout(rgba32f, binding = 0) uniform image2D img_output;
 
 // Scene input data
 uniform Camera viewer;
-// uniform Sphere spheres[32];
+
 layout(std430, binding = 1) readonly buffer sphereData{
     Sphere[] spheres;
 };
@@ -62,6 +68,11 @@ layout(std430, binding = 2) readonly buffer planeData{
 };
 uniform float plane_count;
 
+layout(std430, binding = 3) readonly buffer lightData{
+    Light[] lights;
+};
+uniform float light_count;
+
 // AABB (slab) intersection. Returns true if hit; outputs tHit and hit normal.
 bool intersectAABB(in vec3 ro, in vec3 rd, in vec3 bmin, in vec3 bmax, out float tHit, out vec3 outNormal);
 
@@ -69,6 +80,12 @@ RenderState trace(Ray ray);
 
 RenderState hit(Ray ray, Sphere sphere, float tMin, float tMax, RenderState renderstate);
 RenderState hit(Ray ray, Plane plane, float tMin, float tMax, RenderState renderstate);
+
+float distanceTo(Ray ray, Sphere sphere);
+float distanceTo(Ray ray, Plane plane);
+
+vec3 light_fragement(RenderState renderState);
+
 
 void main() {
     ivec2 pixel_coords = ivec2(gl_GlobalInvocationID.xy);
@@ -106,6 +123,7 @@ RenderState trace(Ray ray){
 
     for (int i = 0; i < sphere_count; i++){
         RenderState newRenderState = hit(ray, spheres[i], 0.001, nearestHit, renderState);
+
 
         if (newRenderState.hit){
             nearestHit = newRenderState.t;

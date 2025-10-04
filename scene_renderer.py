@@ -1,8 +1,9 @@
 import numpy as np
 
 import camera
+import lighting
 from game_object import GameObject, Quad, Cube
-from ray_object import RayTracer, Sphere, Plane
+from ray_object import RayTracer, Sphere, Plane, RayObject
 
 
 class SceneRenderer:
@@ -20,7 +21,7 @@ class SceneRenderer:
         self.rayTracer.add_camera(cam)
 
     def add_object(self, obj):
-        if obj.isRayObj:
+        if isinstance(obj, RayObject) or isinstance(obj, lighting.Light):
             self.rayTracer.add_object(obj)
         else:
             self._objects.append(obj)
@@ -59,11 +60,11 @@ class Scene:
             Sphere(
                 refraction_index=np.random.uniform(low=0.9, high=1.1),
                 center=[
-                    np.random.uniform(low=3.0, high=10.0),
-                    np.random.uniform(low=-8.0, high=8.0),
-                    np.random.uniform(low=-8.0, high=8.0)
+                    np.random.uniform(low=-1.0, high=3.0),
+                    np.random.uniform(low=-1.0, high=3.0),
+                    np.random.uniform(low=-4.0, high=4.0)
                 ],
-                radius=np.random.uniform(low=0.1, high=2.0),
+                radius=np.random.uniform(low=0.1, high=1.0),
                 color=[
                     np.random.uniform(low=0.3, high=1.0),
                     np.random.uniform(low=0.3, high=1.0),
@@ -82,7 +83,7 @@ class Scene:
                 u_max=10,
                 v_min=-10,
                 v_max=10,
-                center=[0, 0, -8],
+                center=[0, 0, -3],
                 color=[
                     np.random.uniform(low=0.3, high=1.0),
                     np.random.uniform(low=0.3, high=1.0),
@@ -94,11 +95,23 @@ class Scene:
         self.camera = camera.Camera(
             position=[-10, 0, 0]
         )
+        self.lights = [lighting.Light(position=[np.random.uniform(low=-5.0, high=5.0),
+                                                np.random.uniform(low=-5.0, high=5.0),
+                                                np.random.uniform(low=5.0, high=10.0)],
+                                      color=[np.random.uniform(low=0.7, high=1.0),
+                                             np.random.uniform(low=0.7, high=1.0),
+                                             np.random.uniform(low=0.7, high=1.0)],
+                                      strength=np.random.uniform(low=1.0, high=3.0)
+                                      ) for i in range(9)
+                       ]
         self.renderer.add_camera(self.camera)
         for sphere in self.spheres:
             self.renderer.add_object(sphere)
 
         for plane in self.planes:
             self.renderer.add_object(plane)
+
+        for light in self.lights:
+            self.renderer.add_object(light)
 
         window.attach_camera(self.camera)
