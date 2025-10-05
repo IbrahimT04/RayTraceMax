@@ -83,7 +83,7 @@ void main() {
     // vec3 pixel = trace(ray);
     vec3 pixel = vec3(1.0);
 
-    for (int i = 0; i < 6; i++){
+    for (int i = 0; i < 9; i++){
 
         RenderState renderState = trace(ray);
         if (!renderState.hit){
