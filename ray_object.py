@@ -2,13 +2,16 @@ from OpenGL.GL import *
 import numpy as np
 from game_object import TexturedQuad
 from lighting import Light
-from utilities import calc_compute_shaders
+from utilities import calc_compute_shaders, get_textures
+from PIL import Image
 
 
 class RayTracer:
     info = {}
 
     def __init__(self, shader_program_name='raytracer'):
+        self.skybox_texture = None
+
         self.spheresNeedUpdate = True
         self.planesNeedUpdate = True
         self.lightsNeedUpdate = True
@@ -28,7 +31,10 @@ class RayTracer:
         self.quad_screen = TexturedQuad(shader_program_name)
 
         self.screenwidth, self.screenheight = 0, 0
+
+        glUseProgram(self.comp_shaders)
         self.create_color_buffer()
+        # self.add_skybox()
         self.create_resource_memory()
 
         self.sphere_objects = []
@@ -45,6 +51,45 @@ class RayTracer:
         else:
             self.light_objects.append(ray_object)
             self.lightsNeedUpdate = True
+
+    def add_skybox(self, path='textures/skybox/kisspng_skybox2.png'):
+        img = Image.open(path).convert('RGBA')
+        w, h = img.size
+        if w % 4 != 0 or h % 3 != 0:
+            raise RuntimeError(f"Skybox image must be 4x3 layout. Got {w}x{h}.")
+        face = w // 4
+        if face != h // 3:
+            raise RuntimeError("Cube faces are not square.")
+
+        def crop(c, r):
+            return img.crop((c * face, r * face, (c + 1) * face, (r + 1) * face))
+
+        faces = [
+            (GL_TEXTURE_CUBE_MAP_POSITIVE_X, crop(2, 1)),
+            (GL_TEXTURE_CUBE_MAP_NEGATIVE_X, crop(0, 1)),
+            (GL_TEXTURE_CUBE_MAP_POSITIVE_Y, crop(1, 0)),
+            (GL_TEXTURE_CUBE_MAP_NEGATIVE_Y, crop(1, 2)),
+            (GL_TEXTURE_CUBE_MAP_POSITIVE_Z, crop(1, 1)),
+            (GL_TEXTURE_CUBE_MAP_NEGATIVE_Z, crop(3, 1)),
+        ]
+
+        glPixelStorei(GL_UNPACK_ALIGNMENT, 1)
+        glActiveTexture(GL_TEXTURE0 + 1)
+        if not getattr(self, 'skybox_texture', None):
+            self.skybox_texture = glGenTextures(1)
+        glBindTexture(GL_TEXTURE_CUBE_MAP, self.skybox_texture)
+
+        for target, im in faces:
+            data = im.tobytes("raw", "RGBA")
+            glTexImage2D(target, 0, GL_RGBA, face, face, 0, GL_RGBA, GL_UNSIGNED_BYTE, data)
+
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE)
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
+
+        glBindTexture(GL_TEXTURE_CUBE_MAP, 0)
 
     def create_color_buffer(self):
         self.screenwidth, self.screenheight = RayTracer.info["window_info"][0], RayTracer.info["window_info"][1]

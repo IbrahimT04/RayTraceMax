@@ -55,6 +55,8 @@ struct InfPlane {
 layout(local_size_x=8, local_size_y=8) in;
 layout(rgba32f, binding = 0) uniform image2D img_output;
 
+//layout(binding = 1) uniform samplerCube sky_cube;
+
 // Scene input data
 uniform Camera viewer;
 
@@ -104,6 +106,7 @@ void main() {
 
         RenderState renderState = trace(ray);
         if (!renderState.hit){
+            // pixel = pixel * vec3(texture(sky_cube, ray.direction)).rgb;
             break;
         }
         pixel = pixel * renderState.color;
