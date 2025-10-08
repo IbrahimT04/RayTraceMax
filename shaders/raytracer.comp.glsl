@@ -26,6 +26,11 @@ struct RenderState {
     vec3 normal;
 };
 
+struct Triangle {
+    vec3 position;
+    vec3 color;
+};
+
 struct Sphere {
     vec3 center;
     float radius;
@@ -55,8 +60,6 @@ struct InfPlane {
 layout(local_size_x=8, local_size_y=8) in;
 layout(rgba32f, binding = 0) uniform image2D img_output;
 
-layout(rgba32f, binding = 4) uniform samplerCube skybox;
-
 // Scene input data
 uniform Camera viewer;
 
@@ -73,6 +76,8 @@ uniform float plane_count;
 layout(std430, binding = 3) readonly buffer lightData{
     Light[] lights;
 };
+layout(rgba32f, binding = 4) uniform samplerCube skybox;
+
 uniform float light_count;
 
 // AABB (slab) intersection. Returns true if hit; outputs tHit and hit normal.
@@ -103,7 +108,7 @@ void main() {
     vec3 pixel = vec3(1.0);
     // pixel = vec3(texture(skybox, ray.direction));
 
-    for (int i = 0; i < 6; i++){
+    for (int i = 0; i < 32; i++){
 
         RenderState renderState = trace(ray);
         if (!renderState.hit){
