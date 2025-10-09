@@ -14,9 +14,13 @@ class RayTracer:
 
         self.output_texture = None
 
+        self.trianglesNeedUpdate = True
         self.spheresNeedUpdate = True
         self.planesNeedUpdate = True
         self.lightsNeedUpdate = True
+
+        self.triangleDataBuffer = None
+        self.triangleData = None
 
         self.planeDataBuffer = None
         self.planeData = None
@@ -29,10 +33,6 @@ class RayTracer:
 
         self.camera = None
 
-        """# Confirm unbinding
-        glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D, 0)"""
-
         self.comp_shaders = calc_compute_shaders(shader_program_name)
         self.quad_screen = TexturedQuad(shader_program_name)
 
@@ -40,16 +40,13 @@ class RayTracer:
 
         glUseProgram(self.comp_shaders)
 
-        """loc = glGetUniformLocation(self.comp_shaders, "skybox")
-        if loc != -1:
-            glUniform1i(loc, 2)"""
-
         self.create_color_buffer()
         self.create_resource_memory()
 
         self.skybox = Skybox()
         self.skybox_texture = None
 
+        self.triangle_objects = []
         self.sphere_objects = []
         self.plane_objects = []
         self.light_objects = []
@@ -58,6 +55,9 @@ class RayTracer:
         if isinstance(ray_object, Sphere):
             self.sphere_objects.append(ray_object)
             self.spheresNeedUpdate = True
+        elif isinstance(ray_object, Triangle):
+            self.triangle_objects.append(ray_object)
+            self.trianglesNeedUpdate = True
         elif isinstance(ray_object, Plane):
             self.plane_objects.append(ray_object)
             self.planesNeedUpdate = True
@@ -79,6 +79,15 @@ class RayTracer:
         glBufferData(GL_SHADER_STORAGE_BUFFER, self.sphereData.nbytes, self.sphereData, GL_DYNAMIC_READ)
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, self.sphereDataBuffer)
 
+        # Triangle Data Allocation
+        self.triangleData = np.zeros(8192 * 12, dtype=np.float32)
+
+        self.triangleDataBuffer = glGenBuffers(1)
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, self.triangleDataBuffer)
+
+        glBufferData(GL_SHADER_STORAGE_BUFFER, self.triangleData.nbytes, self.triangleData, GL_DYNAMIC_READ)
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, self.triangleDataBuffer)
+
         # Plane Data Allocation
         self.planeData = np.zeros(8192 * 20, dtype=np.float32)
 
@@ -86,7 +95,7 @@ class RayTracer:
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, self.planeDataBuffer)
 
         glBufferData(GL_SHADER_STORAGE_BUFFER, self.planeData.nbytes, self.planeData, GL_DYNAMIC_READ)
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, self.planeDataBuffer)
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, self.planeDataBuffer)
 
         # Light Data Allocation
         self.lightData = np.zeros(8192 * 20, dtype=np.float32)
@@ -95,7 +104,7 @@ class RayTracer:
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, self.lightDataBuffer)
 
         glBufferData(GL_SHADER_STORAGE_BUFFER, self.lightData.nbytes, self.lightData, GL_DYNAMIC_READ)
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, self.lightDataBuffer)
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, self.lightDataBuffer)
 
     def add_camera(self, cam):
         self.camera = cam
@@ -114,7 +123,7 @@ class RayTracer:
 
     def record_sphere(self, index, _sphere: 'Sphere'):
         self.spheresNeedUpdate = False
-        self.sphereData[8 * index] = _sphere.center[0]
+        self.sphereData[8 * index    ] = _sphere.center[0]
         self.sphereData[8 * index + 1] = _sphere.center[1]
         self.sphereData[8 * index + 2] = _sphere.center[2]
 
@@ -124,9 +133,27 @@ class RayTracer:
         self.sphereData[8 * index + 5] = _sphere.color[1]
         self.sphereData[8 * index + 6] = _sphere.color[2]
 
+    def record_triangle(self, index, _triangle: 'Triangle'):
+        self.trianglesNeedUpdate = False
+        self.triangleData[12 * index     ] = _triangle.vertex1[0]
+        self.triangleData[12 * index + 1 ] = _triangle.vertex1[1]
+        self.triangleData[12 * index + 2 ] = _triangle.vertex1[2]
+
+        self.triangleData[12 * index + 3 ] = _triangle.vertex2[0]
+        self.triangleData[12 * index + 4 ] = _triangle.vertex2[1]
+        self.triangleData[12 * index + 5 ] = _triangle.vertex2[2]
+
+        self.triangleData[12 * index + 6 ] = _triangle.vertex3[0]
+        self.triangleData[12 * index + 7 ] = _triangle.vertex3[1]
+        self.triangleData[12 * index + 8 ] = _triangle.vertex3[2]
+
+        self.triangleData[12 * index + 9 ] = _triangle.color[0]
+        self.triangleData[12 * index + 10] = _triangle.color[1]
+        self.triangleData[12 * index + 11] = _triangle.color[2]
+
     def record_plane(self, index, _plane: 'Plane'):
         self.planesNeedUpdate = False
-        self.planeData[20 * index] = _plane.center[0]
+        self.planeData[20 * index    ] = _plane.center[0]
         self.planeData[20 * index + 1] = _plane.center[1]
         self.planeData[20 * index + 2] = _plane.center[2]
 
@@ -175,6 +202,19 @@ class RayTracer:
 
             glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, self.sphereDataBuffer)
 
+        if self.trianglesNeedUpdate:
+            # Triangles Update
+            triangles = self.triangle_objects
+            glUniform1f(glGetUniformLocation(self.comp_shaders, "triangle_count"), len(triangles))
+
+            for i, _triangle in enumerate(triangles):
+                self.record_triangle(i, _triangle)
+
+            glBindBuffer(GL_SHADER_STORAGE_BUFFER, self.triangleDataBuffer)
+            glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, 12 * 4 * len(triangles), self.triangleData)
+
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, self.triangleDataBuffer)
+
         if self.planesNeedUpdate:
             # Planes Update
             planes = self.plane_objects
@@ -184,9 +224,9 @@ class RayTracer:
                 self.record_plane(i, _plane)
 
             glBindBuffer(GL_SHADER_STORAGE_BUFFER, self.planeDataBuffer)
-            glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, 19 * 4 * len(planes), self.planeData)
+            glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, 20 * 4 * len(planes), self.planeData)
 
-            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, self.planeDataBuffer)
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, self.planeDataBuffer)
 
         if self.lightsNeedUpdate:
             # Lights Update
@@ -197,9 +237,9 @@ class RayTracer:
                 self.record_light(i, _light)
 
             glBindBuffer(GL_SHADER_STORAGE_BUFFER, self.lightDataBuffer)
-            glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, 19 * 4 * len(lights), self.lightData)
+            glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, 20 * 4 * len(lights), self.lightData)
 
-            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, self.lightDataBuffer)
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, self.lightDataBuffer)
 
         self.skybox.use()
 
@@ -234,6 +274,9 @@ class RayObject:
     def draw(self):
         pass
 
+    def delete(self):
+        pass
+
 
 class MeshRayObject(RayObject):
     pass
@@ -245,18 +288,12 @@ class Sphere(RayObject):
         self.center = np.array(center, dtype=np.float32)
         self.radius = radius
 
-    def destroy(self):
-        pass
-
 
 class InfPlane(RayObject):
     def __init__(self, refraction_index: float, normal, center, color):
         super().__init__(color, refraction_index)
         self.normal = np.array(normal, dtype=np.float32)
         self.center = np.array(center, dtype=np.float32)
-
-    def destroy(self):
-        pass
 
 
 class Plane(InfPlane):
@@ -270,5 +307,10 @@ class Plane(InfPlane):
         self.vMin = v_min
         self.vMax = v_max
 
-    def destroy(self):
-        pass
+
+class Triangle(RayObject):
+    def __init__(self, refraction_index: float, vert1, vert2, vert3, color):
+        RayObject.__init__(self, color, refraction_index)
+        self.vertex1 = np.array(vert1, dtype=np.float32)
+        self.vertex2 = np.array(vert2, dtype=np.float32)
+        self.vertex3 = np.array(vert3, dtype=np.float32)

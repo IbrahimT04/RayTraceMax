@@ -68,15 +68,20 @@ layout(std430, binding = 1) readonly buffer sphereData{
 };
 uniform float sphere_count;
 
-layout(std430, binding = 2) readonly buffer planeData{
+layout(std430, binding = 2) readonly buffer triangleData{
+    Triangle[] triangles;
+};
+uniform float triangle_count;
+
+layout(std430, binding = 3) readonly buffer planeData{
     Plane[] planes;
 };
 uniform float plane_count;
 
-layout(std430, binding = 3) readonly buffer lightData{
+layout(std430, binding = 4) readonly buffer lightData{
     Light[] lights;
 };
-layout(rgba32f, binding = 4) uniform samplerCube skybox;
+layout(rgba32f, binding = 5) uniform samplerCube skybox;
 
 uniform float light_count;
 
