@@ -3,7 +3,7 @@ import numpy as np
 import camera
 import lighting
 from game_object import GameObject, Quad, Cube
-from ray_object import RayTracer, Sphere, Plane, RayObject
+from ray_object import RayTracer, Sphere, Plane, RayObject, Triangle
 
 
 class SceneRenderer:
@@ -92,6 +92,32 @@ class Scene:
             ),
         ]
 
+        self.triangles = [
+            Triangle(
+                refraction_index=np.random.uniform(low=0.9, high=1.1),
+                vert1=[
+                    np.random.uniform(low=-0.5, high=0.5),
+                    np.random.uniform(low=-0.5, high=0.5),
+                    np.random.uniform(low=0.1, high=0.2)
+                ],
+                vert2=[
+                    np.random.uniform(low=0.6, high=1.0),
+                    np.random.uniform(low=0.6, high=1.0),
+                    np.random.uniform(low=0.3, high=0.5)
+                ],
+                vert3=[
+                    np.random.uniform(low=0.6, high=1.0),
+                    np.random.uniform(low=0.6, high=1.0),
+                    np.random.uniform(low=1.0, high=1.2)
+                ],
+                color=[
+                    np.random.uniform(low=0.4, high=0.7),
+                    np.random.uniform(low=0.4, high=0.7),
+                    np.random.uniform(low=0.4, high=0.7)
+                ]
+            ),
+        ]
+
         self.camera = camera.Camera(
             position=[-10, 0, 0]
         )
@@ -107,7 +133,8 @@ class Scene:
         self.renderer.add_camera(self.camera)
         for sphere in self.spheres:
             self.renderer.add_object(sphere)
-
+        for triangle in self.triangles:
+            self.renderer.add_object(triangle)
         for plane in self.planes:
             self.renderer.add_object(plane)
 
