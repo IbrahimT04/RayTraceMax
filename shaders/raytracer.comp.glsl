@@ -91,9 +91,11 @@ bool intersectAABB(in vec3 ro, in vec3 rd, in vec3 bmin, in vec3 bmax, out float
 RenderState trace(Ray ray);
 
 RenderState hit(Ray ray, Sphere sphere, float tMin, float tMax, RenderState renderstate);
+RenderState hit(Ray ray, Triangle triangle, float tMin, float tMax, RenderState renderstate);
 RenderState hit(Ray ray, Plane plane, float tMin, float tMax, RenderState renderstate);
 
 float distanceTo(Ray ray, Sphere sphere);
+float distanceTo(Ray ray, Triangle triangle);
 float distanceTo(Ray ray, Plane plane);
 
 vec3 light_fragement(RenderState renderState);
