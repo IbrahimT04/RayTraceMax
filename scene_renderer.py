@@ -70,7 +70,7 @@ class Scene:
                     np.random.uniform(low=0.3, high=1.0),
                     np.random.uniform(low=0.3, high=1.0)
                 ]
-            ) for _ in range(128)
+            ) for _ in range(64)
         ]
 
         self.planes = [
@@ -95,27 +95,15 @@ class Scene:
         self.triangles = [
             Triangle(
                 refraction_index=np.random.uniform(low=0.9, high=1.1),
-                vert1=[
-                    np.random.uniform(low=-0.5, high=0.5),
-                    np.random.uniform(low=-0.5, high=0.5),
-                    np.random.uniform(low=0.1, high=0.2)
-                ],
-                vert2=[
-                    np.random.uniform(low=0.6, high=1.0),
-                    np.random.uniform(low=0.6, high=1.0),
-                    np.random.uniform(low=0.3, high=0.5)
-                ],
-                vert3=[
-                    np.random.uniform(low=0.6, high=1.0),
-                    np.random.uniform(low=0.6, high=1.0),
-                    np.random.uniform(low=1.0, high=1.2)
-                ],
+                vert1=[0.0, 0.0, 0.0],
+                vert2=[5.0, 5.0, 10.0],
+                vert3=[10.0, 10.0, 5.0],
                 color=[
-                    np.random.uniform(low=0.4, high=0.7),
-                    np.random.uniform(low=0.4, high=0.7),
-                    np.random.uniform(low=0.4, high=0.7)
+                    np.random.uniform(low=0.3, high=0.9),
+                    np.random.uniform(low=0.3, high=0.9),
+                    np.random.uniform(low=0.3, high=0.9)
                 ]
-            ),
+            ) # for i in range(9)
         ]
 
         self.camera = camera.Camera(

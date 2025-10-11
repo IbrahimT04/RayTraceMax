@@ -27,7 +27,9 @@ struct RenderState {
 };
 
 struct Triangle {
-    vec3 position;
+    vec3 v0position;
+    vec3 v1position;
+    vec3 v2position;
     vec3 color;
 };
 
@@ -147,7 +149,7 @@ RenderState trace(Ray ray){
         }
     }
     for (int i = 0; i < triangle_count; i++){
-        RenderState newRenderState = hit(ray, spheres[i], 0.001, nearestHit, renderState);
+        RenderState newRenderState = hit(ray, triangles[i], 0.001, nearestHit, renderState);
 
 
         if (newRenderState.hit){
@@ -189,11 +191,41 @@ RenderState hit(Ray ray, Sphere sphere, float tMin, float tMax, RenderState rend
             return renderstate;
         }
     }
+
     renderstate.hit = false;
+
     return renderstate;
 }
-RenderState hit(Ray ray, Triangle triangle, float tMin, float tMax, RenderState renderstate){
 
+RenderState hit(Ray ray, Triangle triangle, float tMin, float tMax, RenderState renderstate){
+    vec3 e1 = triangle.v1position - triangle.v0position;
+    vec3 e2 = triangle.v2position - triangle.v0position;
+
+    vec3 p0 = cross(ray.direction, e2);
+    float det = dot(p0, e1);
+
+    if (det != 0.0) {
+
+        vec3 t0 = ray.origin - triangle.v0position;
+        vec3 q = cross(t0, e1);
+
+        float u = dot(t0, p0)/det;
+        float v = dot(q, ray.direction)/det;
+
+        float t = dot(e2, q)/det;
+
+        if (u >= 0 && v >= 0 && u + v <= 1 && t > tMin && t < tMax) {
+
+            renderstate.position = t * ray.direction + ray.origin;
+            renderstate.normal = normalize(cross(e1, e2));
+            renderstate.t = t;
+            renderstate.color = triangle.color; // vec3(1.0, 0.2, 0.3);
+            renderstate.hit = true;
+            return renderstate;
+        }
+    }
+
+    renderstate.hit = false;
 
     return renderstate;
 }

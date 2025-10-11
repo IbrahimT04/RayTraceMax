@@ -80,7 +80,7 @@ class RayTracer:
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, self.sphereDataBuffer)
 
         # Triangle Data Allocation
-        self.triangleData = np.zeros(8192 * 12, dtype=np.float32)
+        self.triangleData = np.zeros(8192 * 16, dtype=np.float32)
 
         self.triangleDataBuffer = glGenBuffers(1)
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, self.triangleDataBuffer)
@@ -135,21 +135,26 @@ class RayTracer:
 
     def record_triangle(self, index, _triangle: 'Triangle'):
         self.trianglesNeedUpdate = False
-        self.triangleData[12 * index     ] = _triangle.vertex1[0]
-        self.triangleData[12 * index + 1 ] = _triangle.vertex1[1]
-        self.triangleData[12 * index + 2 ] = _triangle.vertex1[2]
 
-        self.triangleData[12 * index + 3 ] = _triangle.vertex2[0]
-        self.triangleData[12 * index + 4 ] = _triangle.vertex2[1]
-        self.triangleData[12 * index + 5 ] = _triangle.vertex2[2]
+        self.triangleData[16 * index    ] = _triangle.vertex1[0]
+        self.triangleData[16 * index + 1] = _triangle.vertex1[1]
+        self.triangleData[16 * index + 2] = _triangle.vertex1[2]
+        self.triangleData[16 * index + 3] = 0.0   # padding
 
-        self.triangleData[12 * index + 6 ] = _triangle.vertex3[0]
-        self.triangleData[12 * index + 7 ] = _triangle.vertex3[1]
-        self.triangleData[12 * index + 8 ] = _triangle.vertex3[2]
+        self.triangleData[16 * index + 4] = _triangle.vertex2[0]
+        self.triangleData[16 * index + 5] = _triangle.vertex2[1]
+        self.triangleData[16 * index + 6] = _triangle.vertex2[2]
+        self.triangleData[16 * index + 7] = 0.0
 
-        self.triangleData[12 * index + 9 ] = _triangle.color[0]
-        self.triangleData[12 * index + 10] = _triangle.color[1]
-        self.triangleData[12 * index + 11] = _triangle.color[2]
+        self.triangleData[16 * index + 8] = _triangle.vertex3[0]
+        self.triangleData[16 * index + 9] = _triangle.vertex3[1]
+        self.triangleData[16 * index + 10] = _triangle.vertex3[2]
+        self.triangleData[16 * index + 11] = 0.0
+
+        self.triangleData[16 * index + 12] = _triangle.color[0]
+        self.triangleData[16 * index + 13] = _triangle.color[1]
+        self.triangleData[16 * index + 14] = _triangle.color[2]
+        self.triangleData[16 * index + 15] = 0.0
 
     def record_plane(self, index, _plane: 'Plane'):
         self.planesNeedUpdate = False
@@ -211,7 +216,7 @@ class RayTracer:
                 self.record_triangle(i, _triangle)
 
             glBindBuffer(GL_SHADER_STORAGE_BUFFER, self.triangleDataBuffer)
-            glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, 12 * 4 * len(triangles), self.triangleData)
+            glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, 16 * 4 * len(triangles), self.triangleData)
 
             glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, self.triangleDataBuffer)
 
