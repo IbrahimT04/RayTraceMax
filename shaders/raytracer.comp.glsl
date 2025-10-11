@@ -219,7 +219,7 @@ RenderState hit(Ray ray, Triangle triangle, float tMin, float tMax, RenderState 
             renderstate.position = t * ray.direction + ray.origin;
             renderstate.normal = normalize(cross(e1, e2));
             renderstate.t = t;
-            renderstate.color = triangle.color; // vec3(1.0, 0.2, 0.3);
+            renderstate.color = triangle.color;
             renderstate.hit = true;
             return renderstate;
         }
@@ -259,45 +259,4 @@ RenderState hit(Ray ray, Plane plane, float tMin, float tMax, RenderState render
     renderstate.hit = false;
 
     return renderstate;
-}
-
-// AABB (slab) intersection. Returns true if hit; outputs tHit and hit normal.
-bool intersectAABB(in vec3 ro, in vec3 rd, in vec3 bmin, in vec3 bmax, out float tHit, out vec3 outNormal) {
-    // Avoid divisions by zero by using a large number when rd component is nearly zero
-    vec3 safeRd = rd;
-    const float EPS_ZERO = 1e-8;
-    safeRd.x = (abs(safeRd.x) < EPS_ZERO) ? sign(safeRd.x + EPS_ZERO) * EPS_ZERO : safeRd.x;
-    safeRd.y = (abs(safeRd.y) < EPS_ZERO) ? sign(safeRd.y + EPS_ZERO) * EPS_ZERO : safeRd.y;
-    safeRd.z = (abs(safeRd.z) < EPS_ZERO) ? sign(safeRd.z + EPS_ZERO) * EPS_ZERO : safeRd.z;
-
-    vec3 invD = vec3(1.0) / safeRd;
-
-    vec3 t1 = (bmin - ro) * invD;
-    vec3 t2 = (bmax - ro) * invD;
-
-    vec3 tmin = min(t1, t2);
-    vec3 tmax = max(t1, t2);
-
-    float tEnter = max(max(tmin.x, tmin.y), tmin.z);
-    float tExit  = min(min(tmax.x, tmax.y), tmax.z);
-
-    // no intersection or box behind ray
-    if (tEnter > tExit) return false;
-    if (tExit < 0.0) return false;
-
-    tHit = (tEnter >= 0.0) ? tEnter : tExit;
-
-    // compute hit point and robustly determine face normal by comparing coordinates
-    vec3 hitP = ro + rd * tHit;
-    const float EPS_FACE = 1e-4;
-
-    if (abs(hitP.x - bmin.x) < EPS_FACE) outNormal = vec3(-1.0, 0.0, 0.0);
-    else if (abs(hitP.x - bmax.x) < EPS_FACE) outNormal = vec3( 1.0, 0.0, 0.0);
-    else if (abs(hitP.y - bmin.y) < EPS_FACE) outNormal = vec3(0.0, -1.0, 0.0);
-    else if (abs(hitP.y - bmax.y) < EPS_FACE) outNormal = vec3(0.0,  1.0, 0.0);
-    else if (abs(hitP.z - bmin.z) < EPS_FACE) outNormal = vec3(0.0, 0.0, -1.0);
-    else if (abs(hitP.z - bmax.z) < EPS_FACE) outNormal = vec3(0.0, 0.0,  1.0);
-    else outNormal = vec3(0.0); // fallback (shouldn't usually happen)
-
-    return true;
 }

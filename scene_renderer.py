@@ -70,7 +70,7 @@ class Scene:
                     np.random.uniform(low=0.3, high=1.0),
                     np.random.uniform(low=0.3, high=1.0)
                 ]
-            ) for _ in range(64)
+            ) for _ in range(16)
         ]
 
         self.planes = [
@@ -85,9 +85,9 @@ class Scene:
                 v_max=10,
                 center=[0, 0, -3],
                 color=[
-                    np.random.uniform(low=0.4, high=0.7),
-                    np.random.uniform(low=0.4, high=0.7),
-                    np.random.uniform(low=0.4, high=0.7)
+                    np.random.uniform(low=0.2, high=0.9),
+                    np.random.uniform(low=0.2, high=0.9),
+                    np.random.uniform(low=0.2, high=0.9)
                 ]
             ),
         ]
