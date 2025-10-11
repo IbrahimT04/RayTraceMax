@@ -7,9 +7,9 @@ from PIL import Image
 
 
 def get_shaders(shader_program_name):
-    with open(f'shaders/{shader_program_name}.vert') as file:
+    with open(f'SimpleRayTracer/shaders/{shader_program_name}.vert') as file:
         vertex_shader = file.read()
-    with open(f'shaders/{shader_program_name}.frag') as file:
+    with open(f'SimpleRayTracer/shaders/{shader_program_name}.frag') as file:
         fragment_shader = file.read()
 
     return vertex_shader, fragment_shader
@@ -30,7 +30,7 @@ def calc_shaders(shader_program_name):
     return shader
 
 def calc_compute_shaders(shader_program_name):
-    with open(f'shaders/{shader_program_name}.comp.glsl') as file:
+    with open(f'SimpleRayTracer/shaders/{shader_program_name}.comp.glsl') as file:
         compute_src = file.read()
     comp_shader = compileProgram(compileShader(compute_src, GL_COMPUTE_SHADER))
     return comp_shader

@@ -2,7 +2,7 @@ import numpy as np
 
 import camera
 import lighting
-from game_object import GameObject, Quad, Cube
+from game_object import GameObject
 from ray_object import RayTracer, Sphere, Plane, RayObject, Triangle
 
 
