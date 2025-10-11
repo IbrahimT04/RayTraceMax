@@ -1,5 +1,7 @@
+# make_samples_npy.py
 import numpy as np
 
+# --- 32-sample flattened float32 array (length 64) ---
 samples32 = np.array([
  -0.40345673,  0.78177920,
  -0.45489109,  0.48161451,
@@ -33,10 +35,8 @@ samples32 = np.array([
  -0.79150928, -0.34391164,
   0.09255986, -0.97925605
 ], dtype=np.float32)
-# reshape to Nx2 if needed:
-# samples32 = samples32.reshape(32, 2)
 
-
+# --- 64-sample flattened float32 array (length 128) ---
 samples64 = np.array([
  -0.64144267,  0.49076528,
  -0.16410049, -0.12979349,
@@ -97,8 +97,8 @@ samples64 = np.array([
  -0.39059235, -0.26092432,
   0.16882731,  0.07969119
 ], dtype=np.float32)
-# samples64 = samples64.reshape(64, 2)
 
+# --- 128-sample flattened float32 array (length 256) ---
 samples128 = np.array([
   0.19947679, -0.28770561,
   0.44437533, -0.24625929,
@@ -205,4 +205,17 @@ samples128 = np.array([
   0.76202584,  0.57117944,
   0.90646339,  0.04110506
 ], dtype=np.float32)
-# samples128 = samples128.reshape(128, 2)
+"""
+# Save to .npy files in the current directory
+np.save("samples32.npy", samples32)
+np.save("samples64.npy", samples64)
+np.save("samples128.npy", samples128)
+
+# Optional: save them together
+np.savez("samples_all.npz", samples32=samples32, samples64=samples64, samples128=samples128)
+
+print("Saved samples32.npy ({} floats)".format(samples32.size))
+print("Saved samples64.npy ({} floats)".format(samples64.size))
+print("Saved samples128.npy ({} floats)".format(samples128.size))
+print("Saved samples_all.npz")
+"""

@@ -5,13 +5,14 @@ from lighting import Light
 from skybox import Skybox
 from utilities import calc_compute_shaders, get_textures
 from PIL import Image
-
+from samples_uploader import samples32, samples64, samples128
 
 class RayTracer:
     info = {}
+    # arr = np.load("samples128.npy", mmap_mode="r")
+    def __init__(self, shader_program_name='pathtracer'):
 
-    def __init__(self, shader_program_name='raytracer'):
-
+        self.arr = samples64
         self.output_texture = None
 
         self.trianglesNeedUpdate = True
