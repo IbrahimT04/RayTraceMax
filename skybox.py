@@ -74,7 +74,7 @@ class Skybox:
 
 
     def use(self):
-        glActiveTexture(GL_TEXTURE5)
+        glActiveTexture(GL_TEXTURE1)
         glBindTexture(GL_TEXTURE_CUBE_MAP, self.texture)
 
     def destroy(self):

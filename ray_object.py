@@ -77,7 +77,7 @@ class RayTracer:
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, self.sphereDataBuffer)
 
         glBufferData(GL_SHADER_STORAGE_BUFFER, self.sphereData.nbytes, self.sphereData, GL_DYNAMIC_READ)
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, self.sphereDataBuffer)
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, self.sphereDataBuffer)
 
         # Triangle Data Allocation
         self.triangleData = np.zeros(8192 * 12, dtype=np.float32)
@@ -86,7 +86,7 @@ class RayTracer:
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, self.triangleDataBuffer)
 
         glBufferData(GL_SHADER_STORAGE_BUFFER, self.triangleData.nbytes, self.triangleData, GL_DYNAMIC_READ)
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, self.triangleDataBuffer)
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, self.triangleDataBuffer)
 
         # Plane Data Allocation
         self.planeData = np.zeros(8192 * 20, dtype=np.float32)
@@ -95,7 +95,7 @@ class RayTracer:
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, self.planeDataBuffer)
 
         glBufferData(GL_SHADER_STORAGE_BUFFER, self.planeData.nbytes, self.planeData, GL_DYNAMIC_READ)
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, self.planeDataBuffer)
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, self.planeDataBuffer)
 
         # Light Data Allocation
         self.lightData = np.zeros(8192 * 20, dtype=np.float32)
@@ -104,7 +104,7 @@ class RayTracer:
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, self.lightDataBuffer)
 
         glBufferData(GL_SHADER_STORAGE_BUFFER, self.lightData.nbytes, self.lightData, GL_DYNAMIC_READ)
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, self.lightDataBuffer)
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, self.lightDataBuffer)
 
     def add_camera(self, cam):
         self.camera = cam
@@ -200,7 +200,7 @@ class RayTracer:
             glBindBuffer(GL_SHADER_STORAGE_BUFFER, self.sphereDataBuffer)
             glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, 8 * 4 * len(spheres), self.sphereData)
 
-            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, self.sphereDataBuffer)
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, self.sphereDataBuffer)
 
         if self.trianglesNeedUpdate:
             # Triangles Update
@@ -213,7 +213,7 @@ class RayTracer:
             glBindBuffer(GL_SHADER_STORAGE_BUFFER, self.triangleDataBuffer)
             glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, 12 * 4 * len(triangles), self.triangleData)
 
-            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, self.triangleDataBuffer)
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, self.triangleDataBuffer)
 
         if self.planesNeedUpdate:
             # Planes Update
@@ -226,7 +226,7 @@ class RayTracer:
             glBindBuffer(GL_SHADER_STORAGE_BUFFER, self.planeDataBuffer)
             glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, 20 * 4 * len(planes), self.planeData)
 
-            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, self.planeDataBuffer)
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, self.planeDataBuffer)
 
         if self.lightsNeedUpdate:
             # Lights Update
@@ -239,7 +239,7 @@ class RayTracer:
             glBindBuffer(GL_SHADER_STORAGE_BUFFER, self.lightDataBuffer)
             glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, 20 * 4 * len(lights), self.lightData)
 
-            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, self.lightDataBuffer)
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, self.lightDataBuffer)
 
         self.skybox.use()
 

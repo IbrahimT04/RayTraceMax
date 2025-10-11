@@ -63,26 +63,26 @@ layout(rgba32f, binding = 0) uniform image2D img_output;
 // Scene input data
 uniform Camera viewer;
 
-layout(std430, binding = 1) readonly buffer sphereData{
+layout(binding = 1) uniform samplerCube skybox;
+
+layout(std430, binding = 2) readonly buffer sphereData{
     Sphere[] spheres;
 };
 uniform float sphere_count;
 
-layout(std430, binding = 2) readonly buffer triangleData{
+layout(std430, binding = 3) readonly buffer triangleData{
     Triangle[] triangles;
 };
 uniform float triangle_count;
 
-layout(std430, binding = 3) readonly buffer planeData{
+layout(std430, binding = 4) readonly buffer planeData{
     Plane[] planes;
 };
 uniform float plane_count;
 
-layout(std430, binding = 4) readonly buffer lightData{
+layout(std430, binding = 5) readonly buffer lightData{
     Light[] lights;
 };
-layout(rgba32f, binding = 5) uniform samplerCube skybox;
-
 uniform float light_count;
 
 // AABB (slab) intersection. Returns true if hit; outputs tHit and hit normal.
@@ -146,6 +146,15 @@ RenderState trace(Ray ray){
             renderState = newRenderState;
         }
     }
+    for (int i = 0; i < triangle_count; i++){
+        RenderState newRenderState = hit(ray, spheres[i], 0.001, nearestHit, renderState);
+
+
+        if (newRenderState.hit){
+            nearestHit = newRenderState.t;
+            renderState = newRenderState;
+        }
+    }
 
     for (int i = 0; i < plane_count; i++){
         RenderState newRenderState = hit(ray, planes[i], 0.001, nearestHit, renderState);
@@ -183,6 +192,11 @@ RenderState hit(Ray ray, Sphere sphere, float tMin, float tMax, RenderState rend
     renderstate.hit = false;
     return renderstate;
 }
+RenderState hit(Ray ray, Triangle triangle, float tMin, float tMax, RenderState renderstate){
+
+
+    return renderstate;
+}
 
 RenderState hit(Ray ray, Plane plane, float tMin, float tMax, RenderState renderstate){
     float denominator = dot(plane.normal, ray.direction);
@@ -211,6 +225,7 @@ RenderState hit(Ray ray, Plane plane, float tMin, float tMax, RenderState render
     }
 
     renderstate.hit = false;
+
     return renderstate;
 }
 

@@ -60,17 +60,17 @@ class Scene:
             Sphere(
                 refraction_index=np.random.uniform(low=0.9, high=1.1),
                 center=[
-                    np.random.uniform(low=-1.0, high=3.0),
-                    np.random.uniform(low=-1.0, high=3.0),
-                    np.random.uniform(low=-4.0, high=4.0)
+                    np.random.uniform(low=-10.0, high=10.0),
+                    np.random.uniform(low=-10.0, high=10.0),
+                    np.random.uniform(low=-10.0, high=10.0)
                 ],
-                radius=np.random.uniform(low=0.1, high=1.0),
+                radius=np.random.uniform(low=0.3, high=2.0),
                 color=[
                     np.random.uniform(low=0.3, high=1.0),
                     np.random.uniform(low=0.3, high=1.0),
                     np.random.uniform(low=0.3, high=1.0)
                 ]
-            ) for _ in range(4)
+            ) for _ in range(128)
         ]
 
         self.planes = [
