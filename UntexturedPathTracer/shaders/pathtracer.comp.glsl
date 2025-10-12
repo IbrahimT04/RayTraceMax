@@ -256,3 +256,87 @@ RenderState hit(Ray ray, Plane plane, float tMin, float tMax, RenderState render
 
     return renderstate;
 }
+
+/*
+===============================================================================
+Direct quaternion rotation utilities (vec4 quaternion stored as xyz = vector part,
+w = scalar part). These functions are designed for the "one rotation per
+compute-invocation" use-case: compute the quaternion once with quatFromTo(...)
+and then call rotateVecByQuat(...) to rotate any number of vectors (cheap per
+vector). The routines handle degenerate inputs and the antiparallel case.
+
+Usage:
+    // Build quaternion that rotates `a` into `b`:
+    vec4 q = quatFromTo(a, b); // q = vec4(q.xyz, q.w)
+
+    // Rotate a vector `v` by quaternion `q` (cheap; no matrix build):
+    vec3 v_rot = rotateVecByQuat(v, q);
+
+Notes:
+- quatFromTo() will return the identity quaternion vec4(0,0,0,1) if either
+  input is zero-length or the vectors are (nearly) identical.
+- If `a` and `b` are (nearly) opposite, quatFromTo() returns a valid 180°
+  rotation quaternion with w == 0 and xyz the rotation axis.
+- Quaternion layout: vec4(x, y, z, w) where (x,y,z) is the imaginary part and
+  w is the real (scalar) part.
+- If you later need a mat3 for bulk rotation, you can convert the quaternion
+  to a mat3 on the CPU or implement a converter function (not included here to
+  keep per-invocation costs minimal).
+===============================================================================
+*/
+
+const float _Q_EPSILON = 1e-6;
+
+// safe normalize for vec3 (returns zero vec if nearly zero length)
+vec3 normalizeSafeVec3(in vec3 v) {
+    float len = length(v);
+    return (len > _Q_EPSILON) ? (v / len) : vec3(0.0);
+}
+
+// Create a quaternion that rotates vector a -> b.
+// Returns vec4(q.xyz, q.w) where q.w is the scalar part.
+vec4 quatFromTo(in vec3 a_in, in vec3 b_in) {
+    vec3 a = normalizeSafeVec3(a_in);
+    vec3 b = normalizeSafeVec3(b_in);
+
+    // If either is zero (degenerate), return identity quaternion
+    if (length(a) < _Q_EPSILON || length(b) < _Q_EPSILON) {
+        return vec4(0.0, 0.0, 0.0, 1.0);
+    }
+
+    float d = dot(a, b);
+
+    // Nearly identical -> identity quaternion
+    if (d > 1.0 - _Q_EPSILON) {
+        return vec4(0.0, 0.0, 0.0, 1.0);
+    }
+
+    // Nearly opposite -> 180 degree rotation about any orthogonal axis
+    if (d < -1.0 + _Q_EPSILON) {
+        // choose an arbitrary orthogonal vector
+        vec3 ortho = (abs(a.x) < 0.9) ? vec3(1.0, 0.0, 0.0) : vec3(0.0, 1.0, 0.0);
+        vec3 axis = normalizeSafeVec3(cross(a, ortho));
+        // quaternion for 180 degrees: (axis * sin(pi/2), cos(pi/2)) => (axis, 0)
+        return vec4(axis, 0.0);
+    }
+
+    // General case
+    vec3 v = cross(a, b);
+    vec4 q = vec4(v, 1.0 + d);
+    float qlen = length(q);
+    if (qlen > _Q_EPSILON) {
+        q /= qlen;
+    } else {
+        q = vec4(0.0, 0.0, 0.0, 1.0);
+    }
+    return q;
+}
+
+// Rotate vector v by quaternion q (q stored as vec4(q.xyz, q.w))
+// Uses: t = 2 * cross(q.xyz, v); v' = v + q.w * t + cross(q.xyz, t)
+vec3 rotateVecByQuat(in vec3 v, in vec4 q) {
+    vec3 qv = q.xyz;
+    float qw = q.w;
+    vec3 t = 2.0 * cross(qv, v);
+    return v + qw * t + cross(qv, t);
+}
