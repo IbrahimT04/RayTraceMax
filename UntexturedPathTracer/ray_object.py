@@ -1,7 +1,6 @@
 from OpenGL.GL import *
 import numpy as np
-from game_object import TexturedQuad
-from lighting import Light
+from game_object import TexturedQuad, DepthQuad
 from skybox import Skybox
 from utilities import calc_compute_shaders, get_textures
 from PIL import Image
@@ -12,13 +11,12 @@ class RayTracer:
     # arr = np.load("samples128.npy", mmap_mode="r")
     def __init__(self, shader_program_name='pathtracer'):
 
-        self.arr = samples64
+        self.arr = samples128
         self.output_texture = None
 
         self.trianglesNeedUpdate = True
         self.spheresNeedUpdate = True
         self.planesNeedUpdate = True
-        self.lightsNeedUpdate = True
 
         self.triangleDataBuffer = None
         self.triangleData = None
@@ -29,15 +27,13 @@ class RayTracer:
         self.sphereDataBuffer = None
         self.sphereData = None
 
-        self.lightDataBuffer = None
-        self.lightData = None
-
         self.camera = None
 
         self.comp_shaders = calc_compute_shaders(shader_program_name)
-        self.quad_screen = TexturedQuad(shader_program_name)
+        self.quad_screen = DepthQuad(shader_program_name)
 
         self.screenwidth, self.screenheight = 0, 0
+        self.screendepth = 128
 
         glUseProgram(self.comp_shaders)
 
@@ -50,7 +46,6 @@ class RayTracer:
         self.triangle_objects = []
         self.sphere_objects = []
         self.plane_objects = []
-        self.light_objects = []
 
     def add_object(self, ray_object):
         if isinstance(ray_object, Sphere):
@@ -62,13 +57,11 @@ class RayTracer:
         elif isinstance(ray_object, Plane):
             self.plane_objects.append(ray_object)
             self.planesNeedUpdate = True
-        else:
-            self.light_objects.append(ray_object)
-            self.lightsNeedUpdate = True
 
     def create_color_buffer(self):
         self.screenwidth, self.screenheight = RayTracer.info["window_info"][0], RayTracer.info["window_info"][1]
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, self.screenwidth, self.screenheight, 0, GL_RGBA, GL_FLOAT, None)
+        # glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, self.screenwidth, self.screenheight, 0, GL_RGBA, GL_FLOAT, None)
+        glTexImage3D(GL_TEXTURE_3D, 0, GL_RGBA32F, self.screenwidth, self.screenheight, self.screendepth, 0, GL_RGBA, GL_FLOAT, None)
 
     def create_resource_memory(self):
         # Sphere Data Allocation
@@ -98,29 +91,8 @@ class RayTracer:
         glBufferData(GL_SHADER_STORAGE_BUFFER, self.planeData.nbytes, self.planeData, GL_DYNAMIC_READ)
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, self.planeDataBuffer)
 
-        # Light Data Allocation
-        self.lightData = np.zeros(8192 * 20, dtype=np.float32)
-
-        self.lightDataBuffer = glGenBuffers(1)
-        glBindBuffer(GL_SHADER_STORAGE_BUFFER, self.lightDataBuffer)
-
-        glBufferData(GL_SHADER_STORAGE_BUFFER, self.lightData.nbytes, self.lightData, GL_DYNAMIC_READ)
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, self.lightDataBuffer)
-
     def add_camera(self, cam):
         self.camera = cam
-
-    def record_light(self, index, _light: 'Light'):
-        self.lightsNeedUpdate = False
-        self.lightData[8 * index    ] = _light.position[0]
-        self.lightData[8 * index + 1] = _light.position[1]
-        self.lightData[8 * index + 2] = _light.position[2]
-
-        self.lightData[8 * index + 3] = _light.color[0]
-        self.lightData[8 * index + 4] = _light.color[1]
-        self.lightData[8 * index + 5] = _light.color[2]
-
-        self.lightData[8 * index + 6] = _light.strength
 
     def record_sphere(self, index, _sphere: 'Sphere'):
         self.spheresNeedUpdate = False
@@ -234,27 +206,14 @@ class RayTracer:
 
             glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, self.planeDataBuffer)
 
-        if self.lightsNeedUpdate:
-            # Lights Update
-            lights = self.light_objects
-            glUniform1f(glGetUniformLocation(self.comp_shaders, "light_count"), len(lights))
-
-            for i, _light in enumerate(lights):
-                self.record_light(i, _light)
-
-            glBindBuffer(GL_SHADER_STORAGE_BUFFER, self.lightDataBuffer)
-            glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, 20 * 4 * len(lights), self.lightData)
-
-            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, self.lightDataBuffer)
-
-        self.skybox.use()
+            self.skybox.use()
 
     def ray_draw(self):
         glUseProgram(self.comp_shaders)
         glActiveTexture(GL_TEXTURE0)
         glBindImageTexture(0, self.quad_screen.texture, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F)
 
-        glDispatchCompute(self.screenwidth // 8, self.screenheight // 8, 1)
+        glDispatchCompute(self.screenwidth // 8, self.screenheight // 8, 16)
 
         glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT)
 
@@ -272,10 +231,10 @@ class RayTracer:
 class RayObject:
     isRayObj = True
 
-    def __init__(self, color, refraction_index: float, smoothness=1):
+    def __init__(self, color, refraction_index: float, metalic: float=1):
         self.color = np.array(color, dtype=np.float32)
         self.refraction_index = refraction_index
-        self.smoothness = smoothness
+        self.metalic = metalic
 
     def draw(self):
         pass
@@ -289,23 +248,23 @@ class MeshRayObject(RayObject):
 
 
 class Sphere(RayObject):
-    def __init__(self, refraction_index: float, center, radius: float, color):
-        RayObject.__init__(self, color, refraction_index)
+    def __init__(self, refraction_index: float, center, radius: float, color, metalic: float=1):
+        RayObject.__init__(self, color, refraction_index, metalic)
         self.center = np.array(center, dtype=np.float32)
         self.radius = radius
 
 
 class InfPlane(RayObject):
-    def __init__(self, refraction_index: float, normal, center, color):
-        super().__init__(color, refraction_index)
+    def __init__(self, refraction_index: float, normal, center, color, metalic: float=1):
+        super().__init__(color, refraction_index, metalic)
         self.normal = np.array(normal, dtype=np.float32)
         self.center = np.array(center, dtype=np.float32)
 
 
 class Plane(InfPlane):
     def __init__(self, refraction_index: float, normal, tangent, bitangent,
-                 center, color, u_min: float, u_max: float, v_min: float, v_max: float):
-        super().__init__(refraction_index, normal, center, color)
+                 center, color, u_min: float, u_max: float, v_min: float, v_max: float, metalic: float=1):
+        super().__init__(refraction_index, normal, center, color, metalic)
         self.tangent = np.array(tangent, dtype=np.float32)
         self.bitangent = np.array(bitangent, dtype=np.float32)
         self.uMin = u_min
@@ -315,8 +274,8 @@ class Plane(InfPlane):
 
 
 class Triangle(RayObject):
-    def __init__(self, refraction_index: float, vert1, vert2, vert3, color):
-        RayObject.__init__(self, color, refraction_index)
+    def __init__(self, refraction_index: float, vert1, vert2, vert3, color, metalic: float=1):
+        RayObject.__init__(self, color, refraction_index, metalic)
         self.vertex1 = np.array(vert1, dtype=np.float32)
         self.vertex2 = np.array(vert2, dtype=np.float32)
         self.vertex3 = np.array(vert3, dtype=np.float32)

@@ -38,7 +38,7 @@ class Quad(GameObject):
 
     indices = np.array([0, 1, 2,
                         1, 2, 3],
-                       np.uint32)
+                       dtype=np.uint32)
 
     def __init__(self):
         GameObject.__init__(self)
@@ -119,6 +119,37 @@ class TexturedQuad(Quad):
         glEnable(GL_DEPTH_TEST)
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+        glBindVertexArray(0)
+
+class DepthQuad(TexturedQuad):
+    def __init__(self, shader_program_name='default'):
+        GameObject.__init__(self, shader_program_name=shader_program_name)
+
+        self.num_indices = len(self.indices)
+
+        glBindVertexArray(self.vao)
+
+        glBindBuffer(GL_ARRAY_BUFFER, self.vbos)
+        glBufferData(GL_ARRAY_BUFFER, TexturedQuad.vertices.nbytes, TexturedQuad.vertices, GL_STATIC_DRAW)
+
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, self.ebo)
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, TexturedQuad.indices.nbytes, TexturedQuad.indices, GL_STATIC_DRAW)
+
+        glEnableVertexAttribArray(0)
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, TexturedQuad.indices.itemsize * 5, ctypes.c_void_p(0))
+
+        glEnableVertexAttribArray(1)
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, TexturedQuad.indices.itemsize * 5, ctypes.c_void_p(12))
+
+        self.texture = glGenTextures(1)
+        glBindTexture(GL_TEXTURE_3D, self.texture)
+
+        glTexParameterf(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_REPEAT)
+        glTexParameterf(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_REPEAT)
+
+        glTexParameterf(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
+        glTexParameterf(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
+
         glBindVertexArray(0)
 
 class Cube(GameObject):

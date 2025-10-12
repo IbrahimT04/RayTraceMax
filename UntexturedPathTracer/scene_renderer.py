@@ -109,7 +109,7 @@ class Scene:
         self.camera = camera.Camera(
             position=[-10, 0, 0]
         )
-        self.lights = [lighting.Light(position=[np.random.uniform(low=-5.0, high=5.0),
+        """self.lights = [lighting.Light(position=[np.random.uniform(low=-5.0, high=5.0),
                                                 np.random.uniform(low=-5.0, high=5.0),
                                                 np.random.uniform(low=5.0, high=10.0)],
                                       color=[np.random.uniform(low=0.7, high=1.0),
@@ -117,7 +117,7 @@ class Scene:
                                              np.random.uniform(low=0.7, high=1.0)],
                                       strength=np.random.uniform(low=1.0, high=3.0)
                                       ) for i in range(9)
-                       ]
+                       ]"""
         self.renderer.add_camera(self.camera)
         for sphere in self.spheres:
             self.renderer.add_object(sphere)
@@ -126,7 +126,9 @@ class Scene:
         for plane in self.planes:
             self.renderer.add_object(plane)
 
+        """
         for light in self.lights:
             self.renderer.add_object(light)
+        """
 
         window.attach_camera(self.camera)

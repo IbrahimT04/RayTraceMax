@@ -59,8 +59,8 @@ struct InfPlane {
 
 
 //input/output
-layout(local_size_x=8, local_size_y=8) in;
-layout(rgba32f, binding = 0) uniform image2D img_output;
+layout(local_size_x=8, local_size_y=8, local_size_z = 8) in;
+layout(rgba32f, binding = 0) uniform image3D img_output;
 
 // Scene input data
 uniform Camera viewer;
@@ -82,11 +82,6 @@ layout(std430, binding = 4) readonly buffer planeData{
 };
 uniform float plane_count;
 
-layout(std430, binding = 5) readonly buffer lightData{
-    Light[] lights;
-};
-uniform float light_count;
-
 // AABB (slab) intersection. Returns true if hit; outputs tHit and hit normal.
 bool intersectAABB(in vec3 ro, in vec3 rd, in vec3 bmin, in vec3 bmax, out float tHit, out vec3 outNormal);
 
@@ -105,7 +100,7 @@ vec3 light_fragement(RenderState renderState);
 
 void main() {
     ivec2 pixel_coords = ivec2(gl_GlobalInvocationID.xy);
-    ivec2 screen_size = imageSize(img_output);
+    ivec3 screen_size = imageSize(img_output);
     float horizontalCoefficient = ((float(pixel_coords.x) * 2 - screen_size.x) / screen_size.x);
     float verticalCoefficient   = ((float(pixel_coords.y) * 2 - screen_size.y) / screen_size.x);
 
@@ -130,7 +125,8 @@ void main() {
         ray.direction = reflect(ray.direction, renderState.normal);
     }
 
-    imageStore(img_output, pixel_coords, vec4(pixel, 1.0));
+    ivec3 coord3 = ivec3(pixel_coords.x, pixel_coords.y, int(gl_GlobalInvocationID.z));
+    imageStore(img_output, coord3, vec4(pixel, 1.0));
 }
 
 RenderState trace(Ray ray){
