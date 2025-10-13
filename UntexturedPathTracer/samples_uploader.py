@@ -205,6 +205,8 @@ samples128 = np.array([
   0.76202584,  0.57117944,
   0.90646339,  0.04110506
 ], dtype=np.float32)
+
+print(len(samples128))
 """
 # Save to .npy files in the current directory
 np.save("samples32.npy", samples32)

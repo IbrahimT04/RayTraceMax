@@ -59,8 +59,8 @@ struct InfPlane {
 
 
 //input/output
-layout(local_size_x=8, local_size_y=8) in;
-layout(rgba32f, binding = 0) uniform image2D img_output;
+layout(local_size_x=8, local_size_y=8, local_size_z = 8) in;
+layout(rgba32f, binding = 0) uniform image3D img_output;
 
 // Scene input data
 uniform Camera viewer;
@@ -82,11 +82,6 @@ layout(std430, binding = 4) readonly buffer planeData{
 };
 uniform float plane_count;
 
-layout(std430, binding = 5) readonly buffer lightData{
-    Light[] lights;
-};
-uniform float light_count;
-
 // AABB (slab) intersection. Returns true if hit; outputs tHit and hit normal.
 bool intersectAABB(in vec3 ro, in vec3 rd, in vec3 bmin, in vec3 bmax, out float tHit, out vec3 outNormal);
 
@@ -105,7 +100,7 @@ vec3 light_fragement(RenderState renderState);
 
 void main() {
     ivec2 pixel_coords = ivec2(gl_GlobalInvocationID.xy);
-    ivec2 screen_size = imageSize(img_output);
+    ivec3 screen_size = imageSize(img_output);
     float horizontalCoefficient = ((float(pixel_coords.x) * 2 - screen_size.x) / screen_size.x);
     float verticalCoefficient   = ((float(pixel_coords.y) * 2 - screen_size.y) / screen_size.x);
 
@@ -130,7 +125,8 @@ void main() {
         ray.direction = reflect(ray.direction, renderState.normal);
     }
 
-    imageStore(img_output, pixel_coords, vec4(pixel, 1.0));
+    ivec3 coord3 = ivec3(pixel_coords.x, pixel_coords.y, int(gl_GlobalInvocationID.z));
+    imageStore(img_output, coord3, vec4(pixel, 1.0));
 }
 
 RenderState trace(Ray ray){
@@ -261,107 +257,77 @@ RenderState hit(Ray ray, Plane plane, float tMin, float tMax, RenderState render
     return renderstate;
 }
 
-// AABB (slab) intersection. Returns true if hit; outputs tHit and hit normal.
-bool intersectAABB(in vec3 ro, in vec3 rd, in vec3 bmin, in vec3 bmax, out float tHit, out vec3 outNormal) {
-    // Avoid divisions by zero by using a large number when rd component is nearly zero
-    vec3 safeRd = rd;
-    const float EPS_ZERO = 1e-8;
-    safeRd.x = (abs(safeRd.x) < EPS_ZERO) ? sign(safeRd.x + EPS_ZERO) * EPS_ZERO : safeRd.x;
-    safeRd.y = (abs(safeRd.y) < EPS_ZERO) ? sign(safeRd.y + EPS_ZERO) * EPS_ZERO : safeRd.y;
-    safeRd.z = (abs(safeRd.z) < EPS_ZERO) ? sign(safeRd.z + EPS_ZERO) * EPS_ZERO : safeRd.z;
+/*
+===============================================================================
+Direct quaternion rotation utilities (vec4 quaternion stored as xyz = vector part,
+w = scalar part). These functions are designed for the "one rotation per
+compute-invocation" use-case: compute the quaternion once with quatFromTo(...)
+and then call rotateVecByQuat(...) to rotate any number of vectors (cheap per
+vector). The routines handle degenerate inputs and the antiparallel case.
 
-    vec3 invD = vec3(1.0) / safeRd;
+Usage:
+    // Build quaternion that rotates `a` into `b`:
+    vec4 q = quatFromTo(a, b); // q = vec4(q.xyz, q.w)
 
-    vec3 t1 = (bmin - ro) * invD;
-    vec3 t2 = (bmax - ro) * invD;
+    // Rotate a vector `v` by quaternion `q` (cheap; no matrix build):
+    vec3 v_rot = rotateVecByQuat(v, q);
 
-    vec3 tmin = min(t1, t2);
-    vec3 tmax = max(t1, t2);
+Notes:
+- quatFromTo() will return the identity quaternion vec4(0,0,0,1) if either
+  input is zero-length or the vectors are (nearly) identical.
+- If `a` and `b` are (nearly) opposite, quatFromTo() returns a valid 180°
+  rotation quaternion with w == 0 and xyz the rotation axis.
+- Quaternion layout: vec4(x, y, z, w) where (x,y,z) is the imaginary part and
+  w is the real (scalar) part.
+- If you later need a mat3 for bulk rotation, you can convert the quaternion
+  to a mat3 on the CPU or implement a converter function (not included here to
+  keep per-invocation costs minimal).
+===============================================================================
+*/
 
-    float tEnter = max(max(tmin.x, tmin.y), tmin.z);
-    float tExit  = min(min(tmax.x, tmax.y), tmax.z);
+const float EPS_LEN = 1e-6;
+const float EPS_DOT = 1e-7;
 
-    // no intersection or box behind ray
-    if (tEnter > tExit) return false;
-    if (tExit < 0.0) return false;
+vec4 quatFromTo(vec3 a_in, vec3 b_in) {
+    // early length checks (avoid dividing by zero inside normalize)
+    float la = length(a_in);
+    float lb = length(b_in);
+    if (la < EPS_LEN || lb < EPS_LEN) {
+        return vec4(0.0, 0.0, 0.0, 1.0); // identity
+    }
 
-    tHit = (tEnter >= 0.0) ? tEnter : tExit;
+    vec3 a = a_in / la;
+    vec3 b = b_in / lb;
 
-    // compute hit point and robustly determine face normal by comparing coordinates
-    vec3 hitP = ro + rd * tHit;
-    const float EPS_FACE = 1e-4;
+    float d = dot(a, b);
 
-    if (abs(hitP.x - bmin.x) < EPS_FACE) outNormal = vec3(-1.0, 0.0, 0.0);
-    else if (abs(hitP.x - bmax.x) < EPS_FACE) outNormal = vec3( 1.0, 0.0, 0.0);
-    else if (abs(hitP.y - bmin.y) < EPS_FACE) outNormal = vec3(0.0, -1.0, 0.0);
-    else if (abs(hitP.y - bmax.y) < EPS_FACE) outNormal = vec3(0.0,  1.0, 0.0);
-    else if (abs(hitP.z - bmin.z) < EPS_FACE) outNormal = vec3(0.0, 0.0, -1.0);
-    else if (abs(hitP.z - bmax.z) < EPS_FACE) outNormal = vec3(0.0, 0.0,  1.0);
-    else outNormal = vec3(0.0); // fallback (shouldn't usually happen)
+    // nearly identical -> identity rotation
+    if (d > 1.0 - EPS_DOT) {
+        return vec4(0.0, 0.0, 0.0, 1.0);
+    }
 
-    return true;
+    // nearly opposite -> 180 degree rotation about some orthogonal axis
+    if (d < -1.0 + EPS_DOT) {
+        vec3 ortho = (abs(a.x) < 0.6) ? vec3(1.0, 0.0, 0.0) : vec3(0.0, 1.0, 0.0);
+        vec3 axis = normalize(cross(a, ortho));
+        return vec4(axis, 0.0); // w = 0 => 180°
+    }
+
+    // general case -> build quaternion then normalize
+    vec3 v = cross(a, b);
+    vec4 q = vec4(v, 1.0 + d);
+
+    // normalize using inversesqrt, sometimes cheaper
+    float invLen = inversesqrt(dot(q, q));
+    q *= invLen;
+
+    return q;
 }
 
-
-/*
-
-    Moved from main method for testing
-    // ---------- Cube (AABB) ----------
-    // Define cube center and half-size (a cube is an AABB here)
-    vec3 cubeCenter = vec3(6.0, 3.0, 2.0);
-    float halfSize = 1.0;
-    vec3 bmin = cubeCenter - vec3(halfSize);
-    vec3 bmax = cubeCenter + vec3(halfSize);
-
-    float tHit;
-    vec3 hitNormal;
-    bool hit = intersectAABB(ray.origin, ray.direction, bmin, bmax, tHit, hitNormal);
-
-    if (hit) {
-        // Simple face coloring: map normal -> color so faces are visibly different
-        // (normal is in {-1,0,1}, shifting to [0,1] gives distinct colors per face)
-        pixel = hitNormal * 0.5 + 0.5;
-
-        // Optional: simple Lambert-like shading with a fixed light direction to add depth
-        vec3 lightDir = normalize(vec3(-1.0, -1.0, -0.5));
-        float diff = max(0.0, dot(normalize(hitNormal), lightDir));
-        float ambient = 0.2;
-        pixel = pixel * (ambient + 0.8 * diff);
-    } else {
-        // background color when cube not hit
-        pixel += vec3(0.0); // black
-    }
-    */
-
-
-    /*
-    // Ray Trace Sphere
-    // Quadratic Parameters x = (-b +- sqrt(b^2-4ac))/2a
-    float a = dot(ray.direction, ray.direction);
-    float b = 2.0 * dot(ray.direction, ray.origin - sphere.center);
-    float c = dot(ray.origin - sphere.center, ray.origin - sphere.center) - sphere.radius * sphere.radius;
-
-    float discriminant = b * b - 4 * a * c;
-
-    if (discriminant > 0){
-        pixel += sphere.color;
-    }
-
-    */
-    /*
-    // Ray Trace Plane
-    InfPlane plane;
-    plane.normal = vec3(0.0, 0.0, 1.0);
-    plane.center = vec3(0.0, 0.0,-6.0);
-    plane.color = vec3(0.0, 0.0, 1.0);
-
-
-    float denominator = dot(plane.normal, ray.direction);
-
-    if (denominator != 0){
-        float t = (dot(plane.normal, ray.origin)- plane.center[2]) / denominator;
-        if (t < 0){
-            pixel += plane.color;
-        }
-    }
-    */
+// rotate vector v by unit quaternion q (q must be normalized)
+vec3 rotateVecByQuat(vec3 v, vec4 q) {
+    vec3 qv = q.xyz;
+    float qw = q.w;
+    vec3 t = 2.0 * cross(qv, v);
+    return v + qw * t + cross(qv, t);
+}

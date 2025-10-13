@@ -4,19 +4,24 @@ from game_object import TexturedQuad, DepthQuad
 from skybox import Skybox
 from utilities import calc_compute_shaders, get_textures
 from PIL import Image
-from samples_uploader import samples32, samples64, samples128
+# from samples_uploader import samples32, samples64, samples128
+from samples128 import samples128
 
 class RayTracer:
     info = {}
     # arr = np.load("samples128.npy", mmap_mode="r")
     def __init__(self, shader_program_name='pathtracer'):
 
-        self.arr = samples128
         self.output_texture = None
 
+        self.pathSpreadNeedsUpdate = True
         self.trianglesNeedUpdate = True
         self.spheresNeedUpdate = True
         self.planesNeedUpdate = True
+
+        self.pathSpreadBuffer = None
+        self.pathSpreadData = None
+        self.pathSpread = None
 
         self.triangleDataBuffer = None
         self.triangleData = None
@@ -39,6 +44,7 @@ class RayTracer:
 
         self.create_color_buffer()
         self.create_resource_memory()
+        self.add_path_spread()
 
         self.skybox = Skybox()
         self.skybox_texture = None
@@ -91,6 +97,19 @@ class RayTracer:
         glBufferData(GL_SHADER_STORAGE_BUFFER, self.planeData.nbytes, self.planeData, GL_DYNAMIC_READ)
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, self.planeDataBuffer)
 
+        # Path Spread
+        self.pathSpread = samples128
+
+        self.pathSpreadBuffer = glGenBuffers(1)
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, self.pathSpreadBuffer)
+
+        glBufferData(GL_SHADER_STORAGE_BUFFER, self.pathSpread.nbytes, self.pathSpread, GL_STATIC_READ)
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, self.pathSpreadBuffer)
+
+    def add_path_spread(self):
+        glUniform1f(glGetUniformLocation(self.comp_shaders, "path_spread_length"), len(self.pathSpread)//2)
+        # print(len(self.pathSpread))
+
     def add_camera(self, cam):
         self.camera = cam
 
@@ -105,6 +124,8 @@ class RayTracer:
         self.sphereData[8 * index + 4] = _sphere.color[0]
         self.sphereData[8 * index + 5] = _sphere.color[1]
         self.sphereData[8 * index + 6] = _sphere.color[2]
+
+        self.sphereData[8 * index + 7] = _sphere.metalic
 
     def record_triangle(self, index, _triangle: 'Triangle'):
         self.trianglesNeedUpdate = False
@@ -127,7 +148,7 @@ class RayTracer:
         self.triangleData[16 * index + 12] = _triangle.color[0]
         self.triangleData[16 * index + 13] = _triangle.color[1]
         self.triangleData[16 * index + 14] = _triangle.color[2]
-        self.triangleData[16 * index + 15] = 0.0
+        self.triangleData[16 * index + 15] = _triangle.metalic
 
     def record_plane(self, index, _plane: 'Plane'):
         self.planesNeedUpdate = False
@@ -158,6 +179,7 @@ class RayTracer:
         self.planeData[20 * index + 16] = _plane.color[0]
         self.planeData[20 * index + 17] = _plane.color[1]
         self.planeData[20 * index + 18] = _plane.color[2]
+        self.planeData[20 * index + 18] = _plane.metalic
 
     def prepare_scene(self):
 
@@ -166,6 +188,7 @@ class RayTracer:
         glUniform3fv(glGetUniformLocation(self.comp_shaders, "viewer.forwards"), 1, self.camera.forwards)
         glUniform3fv(glGetUniformLocation(self.comp_shaders, "viewer.right"), 1, self.camera.right)
         glUniform3fv(glGetUniformLocation(self.comp_shaders, "viewer.up"), 1, self.camera.up)
+
 
         if self.spheresNeedUpdate:
             # Spheres Update
@@ -205,7 +228,6 @@ class RayTracer:
             glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, 20 * 4 * len(planes), self.planeData)
 
             glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, self.planeDataBuffer)
-
             self.skybox.use()
 
     def ray_draw(self):

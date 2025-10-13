@@ -26,17 +26,24 @@ struct RenderState {
     vec3 normal;
 };
 
+struct PathSpreadVector {
+    float x_val;
+    float y_val;
+};
+
 struct Triangle {
     vec3 v0position;
     vec3 v1position;
     vec3 v2position;
     vec3 color;
+    float metalic;
 };
 
 struct Sphere {
     vec3 center;
     float radius;
     vec3 color;
+    float metalic;
 };
 
 struct Plane {
@@ -49,6 +56,7 @@ struct Plane {
     vec3 normal;
     float vMax;
     vec3 color;
+    float metalic;
 };
 
 struct InfPlane {
@@ -67,20 +75,25 @@ uniform Camera viewer;
 
 layout(binding = 1) uniform samplerCube skybox;
 
-layout(std430, binding = 2) readonly buffer sphereData{
+layout(std430, binding = 2) readonly buffer sphereData {
     Sphere[] spheres;
 };
 uniform float sphere_count;
 
-layout(std430, binding = 3) readonly buffer triangleData{
+layout(std430, binding = 3) readonly buffer triangleData {
     Triangle[] triangles;
 };
 uniform float triangle_count;
 
-layout(std430, binding = 4) readonly buffer planeData{
+layout(std430, binding = 4) readonly buffer planeData {
     Plane[] planes;
 };
 uniform float plane_count;
+
+layout(std430, binding = 5) readonly buffer Data {
+    PathSpreadVector[] paths;
+};
+uniform float path_spread_length;
 
 // AABB (slab) intersection. Returns true if hit; outputs tHit and hit normal.
 bool intersectAABB(in vec3 ro, in vec3 rd, in vec3 bmin, in vec3 bmax, out float tHit, out vec3 outNormal);
@@ -91,12 +104,10 @@ RenderState hit(Ray ray, Sphere sphere, float tMin, float tMax, RenderState rend
 RenderState hit(Ray ray, Triangle triangle, float tMin, float tMax, RenderState renderstate);
 RenderState hit(Ray ray, Plane plane, float tMin, float tMax, RenderState renderstate);
 
-float distanceTo(Ray ray, Sphere sphere);
-float distanceTo(Ray ray, Triangle triangle);
-float distanceTo(Ray ray, Plane plane);
+Ray reflect_ray(Ray ray, RenderState renderstate);
 
-vec3 light_fragement(RenderState renderState);
-
+vec4 quatFromTo(vec3 a_in, vec3 b_in);
+vec3 rotateVecByQuat(vec3 v, vec4 q);
 
 void main() {
     ivec2 pixel_coords = ivec2(gl_GlobalInvocationID.xy);
@@ -112,6 +123,7 @@ void main() {
     vec3 pixel = vec3(1.0);
     // pixel = vec3(texture(skybox, ray.direction));
 
+
     for (int i = 0; i < 32; i++){
 
         RenderState renderState = trace(ray);
@@ -120,7 +132,7 @@ void main() {
             break;
         }
         pixel = pixel * renderState.color;
-
+        // Add reflection logic here
         ray.origin = renderState.position;
         ray.direction = reflect(ray.direction, renderState.normal);
     }
@@ -257,84 +269,49 @@ RenderState hit(Ray ray, Plane plane, float tMin, float tMax, RenderState render
     return renderstate;
 }
 
-/*
-===============================================================================
-Direct quaternion rotation utilities (vec4 quaternion stored as xyz = vector part,
-w = scalar part). These functions are designed for the "one rotation per
-compute-invocation" use-case: compute the quaternion once with quatFromTo(...)
-and then call rotateVecByQuat(...) to rotate any number of vectors (cheap per
-vector). The routines handle degenerate inputs and the antiparallel case.
+const float EPS_LEN = 1e-6;
+const float EPS_DOT = 1e-7;
 
-Usage:
-    // Build quaternion that rotates `a` into `b`:
-    vec4 q = quatFromTo(a, b); // q = vec4(q.xyz, q.w)
 
-    // Rotate a vector `v` by quaternion `q` (cheap; no matrix build):
-    vec3 v_rot = rotateVecByQuat(v, q);
 
-Notes:
-- quatFromTo() will return the identity quaternion vec4(0,0,0,1) if either
-  input is zero-length or the vectors are (nearly) identical.
-- If `a` and `b` are (nearly) opposite, quatFromTo() returns a valid 180°
-  rotation quaternion with w == 0 and xyz the rotation axis.
-- Quaternion layout: vec4(x, y, z, w) where (x,y,z) is the imaginary part and
-  w is the real (scalar) part.
-- If you later need a mat3 for bulk rotation, you can convert the quaternion
-  to a mat3 on the CPU or implement a converter function (not included here to
-  keep per-invocation costs minimal).
-===============================================================================
-*/
-
-const float _Q_EPSILON = 1e-6;
-
-// safe normalize for vec3 (returns zero vec if nearly zero length)
-vec3 normalizeSafeVec3(in vec3 v) {
-    float len = length(v);
-    return (len > _Q_EPSILON) ? (v / len) : vec3(0.0);
-}
-
-// Create a quaternion that rotates vector a -> b.
-// Returns vec4(q.xyz, q.w) where q.w is the scalar part.
-vec4 quatFromTo(in vec3 a_in, in vec3 b_in) {
-    vec3 a = normalizeSafeVec3(a_in);
-    vec3 b = normalizeSafeVec3(b_in);
-
-    // If either is zero (degenerate), return identity quaternion
-    if (length(a) < _Q_EPSILON || length(b) < _Q_EPSILON) {
-        return vec4(0.0, 0.0, 0.0, 1.0);
+vec4 quatFromTo(vec3 a_in, vec3 b_in) {
+    // early length checks (avoid dividing by zero inside normalize)
+    float la = length(a_in);
+    float lb = length(b_in);
+    if (la < EPS_LEN || lb < EPS_LEN) {
+        return vec4(0.0, 0.0, 0.0, 1.0); // identity
     }
+
+    vec3 a = a_in / la;
+    vec3 b = b_in / lb;
 
     float d = dot(a, b);
 
-    // Nearly identical -> identity quaternion
-    if (d > 1.0 - _Q_EPSILON) {
+    // nearly identical -> identity rotation
+    if (d > 1.0 - EPS_DOT) {
         return vec4(0.0, 0.0, 0.0, 1.0);
     }
 
-    // Nearly opposite -> 180 degree rotation about any orthogonal axis
-    if (d < -1.0 + _Q_EPSILON) {
-        // choose an arbitrary orthogonal vector
-        vec3 ortho = (abs(a.x) < 0.9) ? vec3(1.0, 0.0, 0.0) : vec3(0.0, 1.0, 0.0);
-        vec3 axis = normalizeSafeVec3(cross(a, ortho));
-        // quaternion for 180 degrees: (axis * sin(pi/2), cos(pi/2)) => (axis, 0)
-        return vec4(axis, 0.0);
+    // nearly opposite -> 180 degree rotation about some orthogonal axis
+    if (d < -1.0 + EPS_DOT) {
+        vec3 ortho = (abs(a.x) < 0.6) ? vec3(1.0, 0.0, 0.0) : vec3(0.0, 1.0, 0.0);
+        vec3 axis = normalize(cross(a, ortho));
+        return vec4(axis, 0.0); // w = 0 => 180°
     }
 
-    // General case
+    // general case -> build quaternion then normalize
     vec3 v = cross(a, b);
     vec4 q = vec4(v, 1.0 + d);
-    float qlen = length(q);
-    if (qlen > _Q_EPSILON) {
-        q /= qlen;
-    } else {
-        q = vec4(0.0, 0.0, 0.0, 1.0);
-    }
+
+    // normalize using inversesqrt, sometimes cheaper
+    float invLen = inversesqrt(dot(q, q));
+    q *= invLen;
+
     return q;
 }
 
-// Rotate vector v by quaternion q (q stored as vec4(q.xyz, q.w))
-// Uses: t = 2 * cross(q.xyz, v); v' = v + q.w * t + cross(q.xyz, t)
-vec3 rotateVecByQuat(in vec3 v, in vec4 q) {
+// rotate vector v by unit quaternion q (q must be normalized)
+vec3 rotateVecByQuat(vec3 v, vec4 q) {
     vec3 qv = q.xyz;
     float qw = q.w;
     vec3 t = 2.0 * cross(qv, v);
