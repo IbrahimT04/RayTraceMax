@@ -2,7 +2,7 @@ import numpy as np
 from numpy.ma.extras import average
 
 
-def generate_random_coordinates_flat(n_points=128, seed=5):
+def generate_random_coordinates_flat(n_points=128, seed=1):
     """
     Generates n_points coordinate pairs (x, y) where each coordinate is in [0, 1].
     Returns a flattened float32 array of length 2 * n_points.

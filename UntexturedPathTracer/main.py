@@ -4,7 +4,7 @@ from scene_renderer import SceneRenderer, Scene
 
 class Main:
     def __init__(self):
-        self.window = Window(800,600,"My Window")
+        self.window = Window(1200,800,"My Window")
         self.sceneRenderer = SceneRenderer()
 
         self.sceneRenderer.input_info("window_info", self.window.get_window_info())

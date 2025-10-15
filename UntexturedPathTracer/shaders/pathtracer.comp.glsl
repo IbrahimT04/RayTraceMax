@@ -131,7 +131,9 @@ void main() {
     RenderState renderState;
     trace(ray, renderState);
     first_pass(ray, pixel, renderState);
-    next_pass(ray, pixel, renderState);
+    if (renderState.hit){
+        next_pass(ray, pixel, renderState);
+    }
 
     ivec3 coord3 = ivec3(pixel_coords.x, pixel_coords.y, int(gl_GlobalInvocationID.z));
     imageStore(img_output, coord3, vec4(pixel, 1.0));
@@ -139,11 +141,11 @@ void main() {
 
 void first_pass(inout Ray ray, inout vec3 pixel, inout RenderState renderState){
     if (!renderState.hit){
-        pixel = pixel * vec3(texture(skybox, ray.direction));
+        vec3 sky_text = vec3(texture(skybox, ray.direction));
+        pixel = pixel * sky_text;
     }
     else {
         pixel = pixel * renderState.color;
-        // Add reflection logic here
         ray.origin = renderState.position;
         reflect_ray(ray, renderState);
     }
@@ -153,7 +155,8 @@ void next_pass(Ray ray, inout vec3 pixel, RenderState renderState){
     for (int i = 0; i < 32; i++) {
         trace(ray, renderState);
         if (!renderState.hit){
-            pixel = pixel * vec3(texture(skybox, ray.direction));
+            vec3 sky_text = vec3(texture(skybox, ray.direction));
+            pixel = pixel * sky_text;
             break;
         }
         else {
