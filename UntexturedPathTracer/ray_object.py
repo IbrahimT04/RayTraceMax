@@ -179,7 +179,7 @@ class RayTracer:
         self.planeData[20 * index + 16] = _plane.color[0]
         self.planeData[20 * index + 17] = _plane.color[1]
         self.planeData[20 * index + 18] = _plane.color[2]
-        self.planeData[20 * index + 18] = _plane.metalic
+        self.planeData[20 * index + 19] = _plane.metalic
 
     def prepare_scene(self):
 
@@ -233,11 +233,11 @@ class RayTracer:
     def ray_draw(self):
         glUseProgram(self.comp_shaders)
         glActiveTexture(GL_TEXTURE0)
-        glBindImageTexture(0, self.quad_screen.texture, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F)
+        glBindImageTexture(0, self.quad_screen.texture, 0, GL_TRUE, 0, GL_WRITE_ONLY, GL_RGBA32F)
 
         glDispatchCompute(self.screenwidth // 8, self.screenheight // 8, 16)
 
-        glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT)
+        glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_TEXTURE_FETCH_BARRIER_BIT)
 
         glBindImageTexture(0, 0, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F)
 

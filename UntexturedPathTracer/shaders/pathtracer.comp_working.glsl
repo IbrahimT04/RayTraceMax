@@ -23,7 +23,13 @@ struct RenderState {
     vec3 color;
     bool hit;
     vec3 position;
+    float metallic;
     vec3 normal;
+};
+
+struct PathSpreadVector {
+    float x_val;
+    float y_val;
 };
 
 struct Triangle {
@@ -31,12 +37,14 @@ struct Triangle {
     vec3 v1position;
     vec3 v2position;
     vec3 color;
+    float metallic;
 };
 
 struct Sphere {
     vec3 center;
     float radius;
     vec3 color;
+    float metallic;
 };
 
 struct Plane {
@@ -49,6 +57,7 @@ struct Plane {
     vec3 normal;
     float vMax;
     vec3 color;
+    float metallic;
 };
 
 struct InfPlane {
@@ -67,36 +76,43 @@ uniform Camera viewer;
 
 layout(binding = 1) uniform samplerCube skybox;
 
-layout(std430, binding = 2) readonly buffer sphereData{
+layout(std430, binding = 2) readonly buffer sphereData {
     Sphere[] spheres;
 };
 uniform float sphere_count;
 
-layout(std430, binding = 3) readonly buffer triangleData{
+layout(std430, binding = 3) readonly buffer triangleData {
     Triangle[] triangles;
 };
 uniform float triangle_count;
 
-layout(std430, binding = 4) readonly buffer planeData{
+layout(std430, binding = 4) readonly buffer planeData {
     Plane[] planes;
 };
 uniform float plane_count;
 
-// AABB (slab) intersection. Returns true if hit; outputs tHit and hit normal.
-bool intersectAABB(in vec3 ro, in vec3 rd, in vec3 bmin, in vec3 bmax, out float tHit, out vec3 outNormal);
+layout(std430, binding = 5) readonly buffer Data {
+    PathSpreadVector[] paths;
+};
+uniform float path_spread_length;
 
-RenderState trace(Ray ray);
+// AABB (slab) intersection. Returns true if hit; outputs tHit and hit normal.
+// bool intersectAABB(in vec3 ro, in vec3 rd, in vec3 bmin, in vec3 bmax, out float tHit, out vec3 outNormal);
+
+void trace(Ray ray, out RenderState renderState);
 
 RenderState hit(Ray ray, Sphere sphere, float tMin, float tMax, RenderState renderstate);
 RenderState hit(Ray ray, Triangle triangle, float tMin, float tMax, RenderState renderstate);
 RenderState hit(Ray ray, Plane plane, float tMin, float tMax, RenderState renderstate);
 
-float distanceTo(Ray ray, Sphere sphere);
-float distanceTo(Ray ray, Triangle triangle);
-float distanceTo(Ray ray, Plane plane);
+void reflect_ray(inout Ray ray, in RenderState renderState);
 
-vec3 light_fragement(RenderState renderState);
+void first_pass(inout Ray ray, inout vec3 pixel, inout RenderState renderState);
 
+void next_pass(Ray ray, inout vec3 pixel, RenderState renderState);
+
+vec4 quatFromTo(vec3 a_in, vec3 b_in);
+vec3 rotateVecByQuat(vec3 v, vec4 q);
 
 void main() {
     ivec2 pixel_coords = ivec2(gl_GlobalInvocationID.xy);
@@ -112,27 +128,85 @@ void main() {
     vec3 pixel = vec3(1.0);
     // pixel = vec3(texture(skybox, ray.direction));
 
-    for (int i = 0; i < 32; i++){
-
-        RenderState renderState = trace(ray);
-        if (!renderState.hit){
-            pixel = pixel * vec3(texture(skybox, ray.direction));
-            break;
-        }
-        pixel = pixel * renderState.color;
-
-        ray.origin = renderState.position;
-        ray.direction = reflect(ray.direction, renderState.normal);
-    }
+    RenderState renderState;
+    trace(ray, renderState);
+    first_pass(ray, pixel, renderState);
+    next_pass(ray, pixel, renderState);
 
     ivec3 coord3 = ivec3(pixel_coords.x, pixel_coords.y, int(gl_GlobalInvocationID.z));
     imageStore(img_output, coord3, vec4(pixel, 1.0));
 }
 
-RenderState trace(Ray ray){
+void first_pass(inout Ray ray, inout vec3 pixel, inout RenderState renderState){
+    if (!renderState.hit){
+        pixel = pixel * vec3(texture(skybox, ray.direction));
+    }
+    else {
+        pixel = pixel * renderState.color;
+        // Add reflection logic here
+        ray.origin = renderState.position;
+        reflect_ray(ray, renderState);
+    }
+}
+
+void next_pass(Ray ray, inout vec3 pixel, RenderState renderState){
+    for (int i = 0; i < 32; i++) {
+        trace(ray, renderState);
+        if (!renderState.hit){
+            pixel = pixel * vec3(texture(skybox, ray.direction));
+            break;
+        }
+        else {
+            pixel = pixel * renderState.color;
+            ray.origin = renderState.position;
+            ray.direction = reflect(ray.direction, renderState.normal);
+        }
+    }
+}
+
+void reflect_ray(inout Ray ray, inout RenderState renderState) {
+    PathSpreadVector planeSpread = paths[gl_GlobalInvocationID.z/2];
+    /*
+    float spread_x = (planeSpread.x_val) * (1.0-renderState.metallic);
+    float spread_y = (planeSpread.y_val) * (1.0-renderState.metallic);
+    vec3 spreadVector = normalize(vec3(spread_x, spread_y, 1.00001-renderState.metallic));
+    // vec3 spreadVector = vec3(0.0, 0.0, 1.0);
+    vec3 exact_dir = reflect(ray.direction, renderState.normal);
+    vec4 quaternion = quatFromTo(vec3(0.0, 0.0, 1.0), renderState.normal);
+    // vec4 quaternion = quatFromTo(vec3(0.0, 0.0, 1.0), exact_dir);
+
+    ray.direction = rotateVecByQuat(spreadVector, quaternion);
+    */
+    /*
+    vec3 I = normalize(ray.direction);
+    vec3 N = normalize(renderState.normal);
+
+    // Ensure N points against I (so reflect() behaves)
+    N = faceforward(N, I, N);  // pick the variant so that dot(N, I) < 0
+
+    vec3 R = normalize(reflect(I, N)); // mirror direction
+
+    float U1 = planeSpread.x_val;
+    float U2 = planeSpread.y_val;
+
+    // half-angle of the cone (use ROUGHNESS, not metallic, to control width)
+    float maxTheta = mix( 0.0, 0.5, (1.0 - renderState.metallic)); // 0.5 rad ≈ 29°
+    float phi = 2.0 * 3.1415 * U1;
+    float theta = maxTheta * U2;
+
+    float s = sin(theta), c = cos(theta);
+    vec3 local = vec3(cos(phi) * s, sin(phi) * s, c);
+
+    // rotate +Z → R (same as above)
+    vec4 q = quatFromTo(vec3(0,0,1), R);
+    ray.direction = normalize(rotateVecByQuat(local, q));
+    */
+}
+
+void trace(Ray ray, out RenderState renderState){
 
     float nearestHit = 9999999;
-    RenderState renderState;
+    //RenderState renderState;
     renderState.hit = false;
 
     for (int i = 0; i < sphere_count; i++){
@@ -163,7 +237,7 @@ RenderState trace(Ray ray){
         }
     }
 
-    return renderState;
+    // return renderState;
 }
 
 RenderState hit(Ray ray, Sphere sphere, float tMin, float tMax, RenderState renderstate){
@@ -183,14 +257,16 @@ RenderState hit(Ray ray, Sphere sphere, float tMin, float tMax, RenderState rend
             renderstate.normal = normalize(renderstate.position - sphere.center);
             renderstate.t = t;
             renderstate.color = sphere.color;
+            renderstate.metallic = sphere.metallic;
             renderstate.hit = true;
             return renderstate;
         }
+        return renderstate;
     }
-
-    renderstate.hit = false;
-
-    return renderstate;
+    else {
+        renderstate.hit = false;
+        return renderstate;
+    }
 }
 
 RenderState hit(Ray ray, Triangle triangle, float tMin, float tMax, RenderState renderstate){
@@ -216,6 +292,7 @@ RenderState hit(Ray ray, Triangle triangle, float tMin, float tMax, RenderState 
             renderstate.normal = normalize(cross(e1, e2));
             renderstate.t = t;
             renderstate.color = triangle.color;
+            renderstate.metallic = triangle.metallic;
             renderstate.hit = true;
             return renderstate;
         }
@@ -246,6 +323,7 @@ RenderState hit(Ray ray, Plane plane, float tMin, float tMax, RenderState render
                 renderstate.normal = plane.normal;
                 renderstate.t = t;
                 renderstate.color = plane.color;
+                renderstate.metallic = plane.metallic;
                 renderstate.hit = true;
                 return renderstate;
             }
@@ -257,36 +335,10 @@ RenderState hit(Ray ray, Plane plane, float tMin, float tMax, RenderState render
     return renderstate;
 }
 
-/*
-===============================================================================
-Direct quaternion rotation utilities (vec4 quaternion stored as xyz = vector part,
-w = scalar part). These functions are designed for the "one rotation per
-compute-invocation" use-case: compute the quaternion once with quatFromTo(...)
-and then call rotateVecByQuat(...) to rotate any number of vectors (cheap per
-vector). The routines handle degenerate inputs and the antiparallel case.
-
-Usage:
-    // Build quaternion that rotates `a` into `b`:
-    vec4 q = quatFromTo(a, b); // q = vec4(q.xyz, q.w)
-
-    // Rotate a vector `v` by quaternion `q` (cheap; no matrix build):
-    vec3 v_rot = rotateVecByQuat(v, q);
-
-Notes:
-- quatFromTo() will return the identity quaternion vec4(0,0,0,1) if either
-  input is zero-length or the vectors are (nearly) identical.
-- If `a` and `b` are (nearly) opposite, quatFromTo() returns a valid 180°
-  rotation quaternion with w == 0 and xyz the rotation axis.
-- Quaternion layout: vec4(x, y, z, w) where (x,y,z) is the imaginary part and
-  w is the real (scalar) part.
-- If you later need a mat3 for bulk rotation, you can convert the quaternion
-  to a mat3 on the CPU or implement a converter function (not included here to
-  keep per-invocation costs minimal).
-===============================================================================
-*/
-
 const float EPS_LEN = 1e-6;
 const float EPS_DOT = 1e-7;
+
+
 
 vec4 quatFromTo(vec3 a_in, vec3 b_in) {
     // early length checks (avoid dividing by zero inside normalize)
@@ -331,3 +383,61 @@ vec3 rotateVecByQuat(vec3 v, vec4 q) {
     vec3 t = 2.0 * cross(qv, v);
     return v + qw * t + cross(qv, t);
 }
+
+
+/*
+// --- helpers ---
+
+// Cosine-weighted hemisphere sample (local space, +Z is the normal)
+vec3 cosineSampleHemisphere(float u1, float u2) {
+    float r   = sqrt(u1);
+    float phi = 6.283185307179586 * u2; // 2π
+    float x = r * cos(phi);
+    float y = r * sin(phi);
+    float z = sqrt(max(0.0, 1.0 - u1));
+    return vec3(x, y, z);
+}
+
+// Build an orthonormal basis around N (Frisvad 2012)
+void buildONB(in vec3 N, out vec3 T, out vec3 B) {
+    if (N.z < -0.9999999) {
+        T = vec3(0.0, -1.0, 0.0);
+        B = vec3(-1.0,  0.0, 0.0);
+    } else {
+        float a = 1.0 / (1.0 + N.z);
+        float b = -N.x * N.y * a;
+        T = vec3(1.0 - N.x * N.x * a, b, -N.x);
+        B = vec3(b, 1.0 - N.y * N.y * a, -N.y);
+    }
+}
+
+// --- replacement ---
+
+void reflect_ray(inout Ray ray, inout RenderState renderState) {
+    // Normalize inputs
+    vec3 I = normalize(ray.direction);
+    vec3 N = normalize(renderState.normal);
+
+    // Make sure N faces the incoming ray so we sample the visible hemisphere
+    N = faceforward(N, I, N);
+
+    // Two uniform randoms in [0,1) for cosine-weighted sampling
+    PathSpreadVector s = paths[gl_GlobalInvocationID.z / 2];
+    float u1 = s.x_val;
+    float u2 = s.y_val;
+
+    // Sample a local direction around +Z (cosine-weighted)
+    vec3 local = cosineSampleHemisphere(u1, u2);
+
+    // Build tangent/bitangent and map to world (+Z -> N)
+    vec3 T, B;
+    buildONB(N, T, B);
+    vec3 worldDir = normalize(local.x * T + local.y * B + local.z * N);
+
+    // Pure diffuse bounce
+    ray.direction = worldDir;
+
+    // Optional: nudge origin to avoid self-intersections
+    // ray.origin += N * 1e-4;
+}
+*/

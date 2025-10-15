@@ -23,6 +23,7 @@ struct RenderState {
     vec3 color;
     bool hit;
     vec3 position;
+    float metallic;
     vec3 normal;
 };
 
@@ -36,14 +37,14 @@ struct Triangle {
     vec3 v1position;
     vec3 v2position;
     vec3 color;
-    float metalic;
+    float metallic;
 };
 
 struct Sphere {
     vec3 center;
     float radius;
     vec3 color;
-    float metalic;
+    float metallic;
 };
 
 struct Plane {
@@ -56,7 +57,7 @@ struct Plane {
     vec3 normal;
     float vMax;
     vec3 color;
-    float metalic;
+    float metallic;
 };
 
 struct InfPlane {
@@ -96,15 +97,19 @@ layout(std430, binding = 5) readonly buffer Data {
 uniform float path_spread_length;
 
 // AABB (slab) intersection. Returns true if hit; outputs tHit and hit normal.
-bool intersectAABB(in vec3 ro, in vec3 rd, in vec3 bmin, in vec3 bmax, out float tHit, out vec3 outNormal);
+// bool intersectAABB(in vec3 ro, in vec3 rd, in vec3 bmin, in vec3 bmax, out float tHit, out vec3 outNormal);
 
-RenderState trace(Ray ray);
+void trace(Ray ray, out RenderState renderState);
 
 RenderState hit(Ray ray, Sphere sphere, float tMin, float tMax, RenderState renderstate);
 RenderState hit(Ray ray, Triangle triangle, float tMin, float tMax, RenderState renderstate);
 RenderState hit(Ray ray, Plane plane, float tMin, float tMax, RenderState renderstate);
 
-Ray reflect_ray(Ray ray, RenderState renderstate);
+void reflect_ray(inout Ray ray, inout RenderState renderState);
+
+void first_pass(inout Ray ray, inout vec3 pixel, inout RenderState renderState);
+
+void next_pass(Ray ray, inout vec3 pixel, RenderState renderState);
 
 vec4 quatFromTo(vec3 a_in, vec3 b_in);
 vec3 rotateVecByQuat(vec3 v, vec4 q);
@@ -123,28 +128,69 @@ void main() {
     vec3 pixel = vec3(1.0);
     // pixel = vec3(texture(skybox, ray.direction));
 
-
-    for (int i = 0; i < 32; i++){
-
-        RenderState renderState = trace(ray);
-        if (!renderState.hit){
-            pixel = pixel * vec3(texture(skybox, ray.direction));
-            break;
-        }
-        pixel = pixel * renderState.color;
-        // Add reflection logic here
-        ray.origin = renderState.position;
-        ray.direction = reflect(ray.direction, renderState.normal);
-    }
+    RenderState renderState;
+    trace(ray, renderState);
+    first_pass(ray, pixel, renderState);
+    next_pass(ray, pixel, renderState);
 
     ivec3 coord3 = ivec3(pixel_coords.x, pixel_coords.y, int(gl_GlobalInvocationID.z));
     imageStore(img_output, coord3, vec4(pixel, 1.0));
 }
 
-RenderState trace(Ray ray){
+void first_pass(inout Ray ray, inout vec3 pixel, inout RenderState renderState){
+    if (!renderState.hit){
+        pixel = pixel * vec3(texture(skybox, ray.direction));
+    }
+    else {
+        pixel = pixel * renderState.color;
+        // Add reflection logic here
+        ray.origin = renderState.position;
+        reflect_ray(ray, renderState);
+    }
+}
+
+void next_pass(Ray ray, inout vec3 pixel, RenderState renderState){
+    for (int i = 0; i < 32; i++) {
+        trace(ray, renderState);
+        if (!renderState.hit){
+            pixel = pixel * vec3(texture(skybox, ray.direction));
+            break;
+        }
+        else {
+            pixel = pixel * renderState.color;
+            ray.origin = renderState.position;
+            ray.direction = reflect(ray.direction, renderState.normal);
+        }
+    }
+}
+
+void reflect_ray(inout Ray ray, inout RenderState renderState) {
+    PathSpreadVector planeSpread = paths[gl_GlobalInvocationID.z/2];
+    float cos_theta = planeSpread.x_val;
+    float sin_theta = sqrt(1.0 - cos_theta * cos_theta);
+    float cos_phi = cos(2.0 * 3.14159 * planeSpread.y_val);
+    float sin_phi = sin(2.0 * 3.14159 * planeSpread.y_val);
+    vec3 spreadVector = vec3(cos_phi * sin_theta, sin_phi * sin_theta, cos_theta);
+    vec4 quaternion = quatFromTo(vec3(0.0, 0.0, 1.0), renderState.normal);
+
+
+
+    /*
+    float spread_x = (planeSpread.x_val) * (1.0-renderState.metallic);
+    float spread_y = (planeSpread.y_val) * (1.0-renderState.metallic);
+    vec3 spreadVector = normalize(vec3(spread_x, spread_y, 1.00001-renderState.metallic));
+    // vec3 spreadVector = vec3(0.0, 0.0, 1.0);
+    vec3 exact_dir = reflect(ray.direction, renderState.normal);
+    vec4 quaternion = quatFromTo(vec3(0.0, 0.0, 1.0), renderState.normal);
+    // vec4 quaternion = quatFromTo(vec3(0.0, 0.0, 1.0), exact_dir);
+    */
+    ray.direction = rotateVecByQuat(spreadVector, quaternion);
+}
+
+void trace(Ray ray, out RenderState renderState){
 
     float nearestHit = 9999999;
-    RenderState renderState;
+    //RenderState renderState;
     renderState.hit = false;
 
     for (int i = 0; i < sphere_count; i++){
@@ -174,8 +220,6 @@ RenderState trace(Ray ray){
             renderState = newRenderState;
         }
     }
-
-    return renderState;
 }
 
 RenderState hit(Ray ray, Sphere sphere, float tMin, float tMax, RenderState renderstate){
@@ -195,14 +239,16 @@ RenderState hit(Ray ray, Sphere sphere, float tMin, float tMax, RenderState rend
             renderstate.normal = normalize(renderstate.position - sphere.center);
             renderstate.t = t;
             renderstate.color = sphere.color;
+            renderstate.metallic = sphere.metallic;
             renderstate.hit = true;
             return renderstate;
         }
+        return renderstate;
     }
-
-    renderstate.hit = false;
-
-    return renderstate;
+    else {
+        renderstate.hit = false;
+        return renderstate;
+    }
 }
 
 RenderState hit(Ray ray, Triangle triangle, float tMin, float tMax, RenderState renderstate){
@@ -228,6 +274,7 @@ RenderState hit(Ray ray, Triangle triangle, float tMin, float tMax, RenderState 
             renderstate.normal = normalize(cross(e1, e2));
             renderstate.t = t;
             renderstate.color = triangle.color;
+            renderstate.metallic = triangle.metallic;
             renderstate.hit = true;
             return renderstate;
         }
@@ -258,6 +305,7 @@ RenderState hit(Ray ray, Plane plane, float tMin, float tMax, RenderState render
                 renderstate.normal = plane.normal;
                 renderstate.t = t;
                 renderstate.color = plane.color;
+                renderstate.metallic = plane.metallic;
                 renderstate.hit = true;
                 return renderstate;
             }

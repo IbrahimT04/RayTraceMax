@@ -59,6 +59,7 @@ class Scene:
         self.spheres = [
             Sphere(
                 refraction_index=np.random.uniform(low=0.9, high=1.1),
+                metalic=np.random.uniform(low=0.0, high=1.0),
                 center=[
                     np.random.uniform(low=-10.0, high=10.0),
                     np.random.uniform(low=-10.0, high=10.0),
@@ -70,12 +71,13 @@ class Scene:
                     np.random.uniform(low=0.3, high=1.0),
                     np.random.uniform(low=0.3, high=1.0)
                 ]
-            ) for _ in range(16)
+            ) for _ in range(32)
         ]
 
-        self.planes = [
+        """self.planes = [
             Plane(
                 refraction_index=np.random.uniform(low=0.9, high=1.1),
+                metalic=np.random.uniform(low=0.0, high=1.0),
                 normal=[0, 0, 1],
                 tangent=[1, 0, 0],
                 bitangent=[0, 1, 0],
@@ -90,11 +92,27 @@ class Scene:
                     np.random.uniform(low=0.2, high=0.9)
                 ]
             ),
+        ]"""
+        self.planes = [
+            Plane(
+                refraction_index=np.random.uniform(low=0.9, high=1.1),
+                metalic=np.random.uniform(low=0.0, high=1.0),
+                normal=[0, 0, 1],
+                tangent=[1, 0, 0],
+                bitangent=[0, 1, 0],
+                u_min=-10,
+                u_max=10,
+                v_min=-10,
+                v_max=10,
+                center=[0, 0, -3],
+                color=[1.0,1.0,1.0]
+            ),
         ]
 
         self.triangles = [
             Triangle(
                 refraction_index=np.random.uniform(low=0.9, high=1.1),
+                metalic=np.random.uniform(low=0.5, high=1.0),
                 vert1=[0.0, 0.0, 0.0],
                 vert2=[5.0, 5.0, 10.0],
                 vert3=[10.0, 10.0, 5.0],
@@ -121,8 +139,8 @@ class Scene:
         self.renderer.add_camera(self.camera)
         for sphere in self.spheres:
             self.renderer.add_object(sphere)
-        for triangle in self.triangles:
-            self.renderer.add_object(triangle)
+        """for triangle in self.triangles:
+            self.renderer.add_object(triangle)"""
         for plane in self.planes:
             self.renderer.add_object(plane)
 
