@@ -4,12 +4,10 @@ from game_object import TexturedQuad, DepthQuad
 from skybox import Skybox
 from utilities import calc_compute_shaders, get_textures
 from PIL import Image
-# from samples_uploader import samples32, samples64, samples128
-from samples128 import samples128
+from samples128 import samples128, samples256, samples1024
 
 class RayTracer:
     info = {}
-    # arr = np.load("samples128.npy", mmap_mode="r")
     def __init__(self, shader_program_name='pathtracer'):
 
         self.output_texture = None
@@ -21,7 +19,8 @@ class RayTracer:
 
         self.pathSpreadBuffer = None
         self.pathSpreadData = None
-        self.pathSpread = None
+        # Path Spread
+        self.pathSpread = samples1024
 
         self.triangleDataBuffer = None
         self.triangleData = None
@@ -38,7 +37,7 @@ class RayTracer:
         self.quad_screen = DepthQuad(shader_program_name)
 
         self.screenwidth, self.screenheight = 0, 0
-        self.screendepth = 128
+        self.screendepth = len(self.pathSpread)
 
         glUseProgram(self.comp_shaders)
 
@@ -98,8 +97,6 @@ class RayTracer:
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, self.planeDataBuffer)
 
         # Path Spread
-        self.pathSpread = samples128
-
         self.pathSpreadBuffer = glGenBuffers(1)
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, self.pathSpreadBuffer)
 
@@ -235,7 +232,7 @@ class RayTracer:
         glActiveTexture(GL_TEXTURE0)
         glBindImageTexture(0, self.quad_screen.texture, 0, GL_TRUE, 0, GL_WRITE_ONLY, GL_RGBA32F)
 
-        glDispatchCompute(self.screenwidth // 8, self.screenheight // 8, 16)
+        glDispatchCompute(self.screenwidth // 8, self.screenheight // 8, self.screendepth // 4)
 
         glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_TEXTURE_FETCH_BARRIER_BIT)
 

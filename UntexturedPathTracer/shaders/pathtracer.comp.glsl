@@ -20,11 +20,13 @@ struct Ray {
 
 struct RenderState {
     float t;
-    vec3 color;
+    vec3 diffuse;
     bool hit;
     vec3 position;
     float metallic;
     vec3 normal;
+    vec3 in_vec;
+    vec3 out_vec;
 };
 
 struct PathSpreadVector {
@@ -68,7 +70,7 @@ struct InfPlane {
 
 
 //input/output
-layout(local_size_x=8, local_size_y=8, local_size_z = 8) in;
+layout(local_size_x=8, local_size_y=8, local_size_z = 4) in;
 layout(rgba32f, binding = 0) uniform image3D img_output;
 
 // Scene input data
@@ -129,6 +131,7 @@ void main() {
     // pixel = vec3(texture(skybox, ray.direction));
 
     RenderState renderState;
+    //renderState.diffuse = vec3(1.0);
     trace(ray, renderState);
     first_pass(ray, pixel, renderState);
     if (renderState.hit){
@@ -139,61 +142,9 @@ void main() {
     imageStore(img_output, coord3, vec4(pixel, 1.0));
 }
 
-void first_pass(inout Ray ray, inout vec3 pixel, inout RenderState renderState){
-    if (!renderState.hit){
-        vec3 sky_text = vec3(texture(skybox, ray.direction));
-        pixel = pixel * sky_text;
-    }
-    else {
-        pixel = pixel * renderState.color;
-        ray.origin = renderState.position;
-        reflect_ray(ray, renderState);
-    }
-}
-
-void next_pass(Ray ray, inout vec3 pixel, RenderState renderState){
-    for (int i = 0; i < 32; i++) {
-        trace(ray, renderState);
-        if (!renderState.hit){
-            vec3 sky_text = vec3(texture(skybox, ray.direction));
-            pixel = pixel * sky_text;
-            break;
-        }
-        else {
-            pixel = pixel * renderState.color;
-            ray.origin = renderState.position;
-            ray.direction = reflect(ray.direction, renderState.normal);
-        }
-    }
-}
-
-void reflect_ray(inout Ray ray, inout RenderState renderState) {
-    PathSpreadVector planeSpread = paths[gl_GlobalInvocationID.z/2];
-    float cos_theta = planeSpread.x_val;
-    float sin_theta = sqrt(1.0 - cos_theta * cos_theta);
-    float cos_phi = cos(2.0 * 3.14159 * planeSpread.y_val);
-    float sin_phi = sin(2.0 * 3.14159 * planeSpread.y_val);
-    vec3 spreadVector = vec3(cos_phi * sin_theta, sin_phi * sin_theta, cos_theta);
-    vec4 quaternion = quatFromTo(vec3(0.0, 0.0, 1.0), renderState.normal);
-
-
-
-    /*
-    float spread_x = (planeSpread.x_val) * (1.0-renderState.metallic);
-    float spread_y = (planeSpread.y_val) * (1.0-renderState.metallic);
-    vec3 spreadVector = normalize(vec3(spread_x, spread_y, 1.00001-renderState.metallic));
-    // vec3 spreadVector = vec3(0.0, 0.0, 1.0);
-    vec3 exact_dir = reflect(ray.direction, renderState.normal);
-    vec4 quaternion = quatFromTo(vec3(0.0, 0.0, 1.0), renderState.normal);
-    // vec4 quaternion = quatFromTo(vec3(0.0, 0.0, 1.0), exact_dir);
-    */
-    ray.direction = rotateVecByQuat(spreadVector, quaternion);
-}
-
 void trace(Ray ray, out RenderState renderState){
 
     float nearestHit = 9999999;
-    //RenderState renderState;
     renderState.hit = false;
 
     for (int i = 0; i < sphere_count; i++){
@@ -223,6 +174,53 @@ void trace(Ray ray, out RenderState renderState){
             renderState = newRenderState;
         }
     }
+    renderState.in_vec = normalize(-ray.direction);
+}
+
+void first_pass(inout Ray ray, inout vec3 pixel, inout RenderState renderState){
+    if (!renderState.hit){
+        vec3 sky_text = vec3(texture(skybox, ray.direction));
+        pixel = pixel * sky_text;
+    }
+    else {
+        ray.origin = renderState.position;
+        reflect_ray(ray, renderState);
+        renderState.out_vec = normalize(ray.direction);
+        pixel = pixel * renderState.diffuse * dot(renderState.out_vec, renderState.normal);
+        // pixel = pixel * renderState.diffuse;
+    }
+}
+
+void next_pass(Ray ray, inout vec3 pixel, RenderState renderState){
+    for (int i = 0; i < 32; i++) {
+        trace(ray, renderState);
+        if (!renderState.hit){
+            vec3 sky_text = vec3(texture(skybox, ray.direction));
+            pixel = pixel * sky_text;
+            // pixel = pixel * (1/3.14159 * 10.0) * tan(3.14159 * (length(sky_text)/2)) * sky_text;
+            // pixel = pixel * sky_text * 1.0/5.0 * (pow(7, length(sky_text)) - 1) * sky_text;
+            break;
+        }
+        else {
+            // pixel = pixel * renderState.diffuse;
+            ray.origin = renderState.position;
+            ray.direction = reflect(ray.direction, renderState.normal);
+            renderState.out_vec = ray.direction;
+            pixel = pixel * renderState.diffuse * dot(renderState.out_vec, renderState.normal);
+        }
+    }
+}
+
+void reflect_ray(inout Ray ray, inout RenderState renderState) {
+    PathSpreadVector planeSpread = paths[gl_GlobalInvocationID.z/2];
+    float cos_theta = planeSpread.x_val;
+    float sin_theta = sqrt(1.0 - cos_theta * cos_theta);
+    float cos_phi = cos(2.0 * 3.14159 * planeSpread.y_val);
+    float sin_phi = sin(2.0 * 3.14159 * planeSpread.y_val);
+    vec3 spreadVector = vec3(cos_phi * sin_theta, sin_phi * sin_theta, cos_theta);
+    vec4 quaternion = quatFromTo(vec3(0.0, 0.0, 1.0), renderState.normal);
+
+    ray.direction = rotateVecByQuat(spreadVector, quaternion);
 }
 
 RenderState hit(Ray ray, Sphere sphere, float tMin, float tMax, RenderState renderstate){
@@ -241,7 +239,7 @@ RenderState hit(Ray ray, Sphere sphere, float tMin, float tMax, RenderState rend
             renderstate.position = ray.origin + t * ray.direction;
             renderstate.normal = normalize(renderstate.position - sphere.center);
             renderstate.t = t;
-            renderstate.color = sphere.color;
+            renderstate.diffuse = sphere.color; // * dot(renderstate.normal, -ray.direction);
             renderstate.metallic = sphere.metallic;
             renderstate.hit = true;
             return renderstate;
@@ -274,9 +272,9 @@ RenderState hit(Ray ray, Triangle triangle, float tMin, float tMax, RenderState 
         if (u >= 0 && v >= 0 && u + v <= 1 && t > tMin && t < tMax) {
 
             renderstate.position = t * ray.direction + ray.origin;
-            renderstate.normal = normalize(cross(e1, e2));
+            renderstate.normal = normalize(cross(e1, e2)) * det/abs(det);
             renderstate.t = t;
-            renderstate.color = triangle.color;
+            renderstate.diffuse = triangle.color; // * dot(renderstate.normal, -ray.direction);
             renderstate.metallic = triangle.metallic;
             renderstate.hit = true;
             return renderstate;
@@ -305,9 +303,9 @@ RenderState hit(Ray ray, Plane plane, float tMin, float tMax, RenderState render
 
             if (u_vec > plane.uMin && u_vec < plane.uMax && v_vec > plane.vMin && v_vec < plane.vMax) {
                 renderstate.position = point;
-                renderstate.normal = plane.normal;
+                renderstate.normal = normalize(plane.normal * -denominator/abs(denominator));
                 renderstate.t = t;
-                renderstate.color = plane.color;
+                renderstate.diffuse = plane.color; // * abs(dot(renderstate.normal, -ray.direction));
                 renderstate.metallic = plane.metallic;
                 renderstate.hit = true;
                 return renderstate;

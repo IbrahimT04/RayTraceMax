@@ -17,3 +17,7 @@ samples128 = generate_random_coordinates_flat()
 # print(samples128.dtype)  # float32
 # print(samples128)
 # print(average(samples128))
+
+samples256 = generate_random_coordinates_flat(n_points=256, seed=5)
+
+samples1024 = generate_random_coordinates_flat(n_points=1024, seed=2)

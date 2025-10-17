@@ -71,7 +71,7 @@ class Scene:
                     np.random.uniform(low=0.3, high=1.0),
                     np.random.uniform(low=0.3, high=1.0)
                 ]
-            ) for _ in range(4)
+            ) for _ in range(16)
         ]
 
         """self.planes = [
@@ -139,8 +139,8 @@ class Scene:
         self.renderer.add_camera(self.camera)
         for sphere in self.spheres:
             self.renderer.add_object(sphere)
-        """for triangle in self.triangles:
-            self.renderer.add_object(triangle)"""
+        for triangle in self.triangles:
+            self.renderer.add_object(triangle)
         for plane in self.planes:
             self.renderer.add_object(plane)
 
