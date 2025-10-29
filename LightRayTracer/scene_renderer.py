@@ -2,8 +2,8 @@ import numpy as np
 
 import camera
 import lighting
-from UntexturedPathTracer.game_object import GameObject
-from UntexturedPathTracer.ray_object import RayTracer, Sphere, Plane, RayObject, Triangle
+from game_object import GameObject
+from ray_object import RayTracer, Sphere, Plane, RayObject, Triangle
 
 
 class SceneRenderer:
@@ -59,8 +59,6 @@ class Scene:
         self.spheres = [
             Sphere(
                 refraction_index=np.random.uniform(low=0.9, high=1.1),
-                metalic=np.random.uniform(low=0.0, high=1.0),
-                emissive=[0.0, 0.0, 0.0],
                 center=[
                     np.random.uniform(low=-10.0, high=10.0),
                     np.random.uniform(low=-10.0, high=10.0),
@@ -74,21 +72,10 @@ class Scene:
                 ]
             ) for _ in range(16)
         ]
-        """self.sun = Sphere(
-            refraction_index=np.random.uniform(low=0.9, high=1.1),
-            metalic=0.0,
-            emissive=[255.0, 166.0, 33.0],
-            center=[50.0, 50.0, 50.0],
-            radius=5.0,
-            color=[1.0, 1.0, 1.0]
-                        )
-        self.spheres.append(self.sun)"""
 
         self.planes = [
             Plane(
                 refraction_index=np.random.uniform(low=0.9, high=1.1),
-                metalic=1.0,# np.random.uniform(low=0.0, high=1.0),
-                emissive=[0.0, 0.0, 0.0],
                 normal=[0, 0, 1],
                 tangent=[1, 0, 0],
                 bitangent=[0, 1, 0],
@@ -101,15 +88,13 @@ class Scene:
                     np.random.uniform(low=0.2, high=0.9),
                     np.random.uniform(low=0.2, high=0.9),
                     np.random.uniform(low=0.2, high=0.9)
-                ] # [1.0,1.0,1.0]
+                ]
             ),
         ]
 
         self.triangles = [
             Triangle(
                 refraction_index=np.random.uniform(low=0.9, high=1.1),
-                metalic=0.0, # np.random.uniform(low=0.0, high=1.0),
-                emissive=[0.0, 0.0, 0.0],
                 vert1=[0.0, 0.0, 0.0],
                 vert2=[5.0, 5.0, 10.0],
                 vert3=[10.0, 10.0, 5.0],
@@ -124,7 +109,7 @@ class Scene:
         self.camera = camera.Camera(
             position=[-10, 0, 0]
         )
-        """self.lights = [lighting.Light(position=[np.random.uniform(low=-5.0, high=5.0),
+        self.lights = [lighting.Light(position=[np.random.uniform(low=-5.0, high=5.0),
                                                 np.random.uniform(low=-5.0, high=5.0),
                                                 np.random.uniform(low=5.0, high=10.0)],
                                       color=[np.random.uniform(low=0.7, high=1.0),
@@ -132,7 +117,7 @@ class Scene:
                                              np.random.uniform(low=0.7, high=1.0)],
                                       strength=np.random.uniform(low=1.0, high=3.0)
                                       ) for i in range(9)
-                       ]"""
+                       ]
         self.renderer.add_camera(self.camera)
         for sphere in self.spheres:
             self.renderer.add_object(sphere)
@@ -141,9 +126,7 @@ class Scene:
         for plane in self.planes:
             self.renderer.add_object(plane)
 
-        """
         for light in self.lights:
             self.renderer.add_object(light)
-        """
 
         window.attach_camera(self.camera)
