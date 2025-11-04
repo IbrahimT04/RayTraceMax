@@ -99,18 +99,16 @@ uniform float plane_count;
 
 layout(rgba32f, binding = 7) uniform image2D ray_output;
 
+uniform vec3 sun_pos = vec3(100.0);
+uniform float sun_radius = 10.0;
+
 void trace(Ray ray, out RenderState renderState);
 
 RenderState hit(Ray ray, Sphere sphere, float tMin, float tMax, RenderState renderstate);
 RenderState hit(Ray ray, Triangle triangle, float tMin, float tMax, RenderState renderstate);
 RenderState hit(Ray ray, Plane plane, float tMin, float tMax, RenderState renderstate);
 
-void first_pass(inout Ray ray, inout vec3 pixel, inout RenderState renderState);
-
 void ray_traversal(Ray ray, inout vec3 pixel, RenderState renderState);
-
-vec4 quatFromTo(vec3 a_in, vec3 b_in);
-vec3 rotateVecByQuat(vec3 v, vec4 q);
 
 void main() {
     ivec2 pixel_coords = ivec2(gl_GlobalInvocationID.xy);
@@ -128,7 +126,6 @@ void main() {
     ray_traversal(ray, pixel, renderState);
 
     ivec2 coord3 = ivec2(pixel_coords.x, pixel_coords.y);
-    // imageStore(ray_output, coord3, vec4(pixel, 1.0));
     imageStore(ray_output, coord3, vec4(pixel, 1.0));
 }
 
@@ -137,7 +134,7 @@ void trace(Ray ray, out RenderState renderState){
     float nearestHit = 9999999;
     renderState.hit = false;
 
-    for (int i = 0; i < sphere_count; i++){
+    for (int i = 0; i < sphere_count; i++) {
         RenderState newRenderState = hit(ray, spheres[i], 0.001, nearestHit, renderState);
 
 
@@ -146,7 +143,7 @@ void trace(Ray ray, out RenderState renderState){
             renderState = newRenderState;
         }
     }
-    for (int i = 0; i < triangle_count; i++){
+    for (int i = 0; i < triangle_count; i++) {
         RenderState newRenderState = hit(ray, triangles[i], 0.001, nearestHit, renderState);
 
 
@@ -156,7 +153,7 @@ void trace(Ray ray, out RenderState renderState){
         }
     }
 
-    for (int i = 0; i < plane_count; i++){
+    for (int i = 0; i < plane_count; i++) {
         RenderState newRenderState = hit(ray, planes[i], 0.001, nearestHit, renderState);
 
         if (newRenderState.hit){
@@ -180,7 +177,7 @@ void ray_traversal(Ray ray, inout vec3 pixel, RenderState renderState){
             ray.direction = reflect(ray.direction, renderState.normal);
             renderState.out_vec = ray.direction;
             vec3 diffuse = (renderState.diffuse/3.1415) * dot(renderState.out_vec, renderState.normal);
-            pixel = renderState.emissive + (pixel * renderState.diffuse);
+            pixel = renderState.emissive + (1.0 - renderState.metallic) * (pixel * renderState.diffuse);
         }
     }
 }
@@ -191,10 +188,10 @@ RenderState hit(Ray ray, Sphere sphere, float tMin, float tMax, RenderState rend
     float b = 2.0 * dot(ray.direction, dist);
     float c = dot(dist, dist) - sphere.radius * sphere.radius;
 
-    float discriminant = b * b - 4 * a * c;
+    float determinant = b * b - 4 * a * c;
 
-    if (discriminant > 0){
-        float t = (-b - sqrt(discriminant)) / (2 * a);
+    if (determinant > 0){
+        float t = (-b - sqrt(determinant)) / (2 * a);
 
         if (t > tMin && t < tMax){
 
@@ -281,53 +278,4 @@ RenderState hit(Ray ray, Plane plane, float tMin, float tMax, RenderState render
     renderstate.hit = false;
 
     return renderstate;
-}
-
-const float EPS_LEN = 1e-6;
-const float EPS_DOT = 1e-7;
-
-
-
-vec4 quatFromTo(vec3 a_in, vec3 b_in) {
-    // early length checks (avoid dividing by zero inside normalize)
-    float la = length(a_in);
-    float lb = length(b_in);
-    if (la < EPS_LEN || lb < EPS_LEN) {
-        return vec4(0.0, 0.0, 0.0, 1.0); // identity
-    }
-
-    vec3 a = a_in / la;
-    vec3 b = b_in / lb;
-
-    float d = dot(a, b);
-
-    // nearly identical -> identity rotation
-    if (d > 1.0 - EPS_DOT) {
-        return vec4(0.0, 0.0, 0.0, 1.0);
-    }
-
-    // nearly opposite -> 180 degree rotation about some orthogonal axis
-    if (d < -1.0 + EPS_DOT) {
-        vec3 ortho = (abs(a.x) < 0.6) ? vec3(1.0, 0.0, 0.0) : vec3(0.0, 1.0, 0.0);
-        vec3 axis = normalize(cross(a, ortho));
-        return vec4(axis, 0.0); // w = 0 => 180°
-    }
-
-    // general case -> build quaternion then normalize
-    vec3 v = cross(a, b);
-    vec4 q = vec4(v, 1.0 + d);
-
-    // normalize using inversesqrt, sometimes cheaper
-    float invLen = inversesqrt(dot(q, q));
-    q *= invLen;
-
-    return q;
-}
-
-// rotate vector v by unit quaternion q (q must be normalized)
-vec3 rotateVecByQuat(vec3 v, vec4 q) {
-    vec3 qv = q.xyz;
-    float qw = q.w;
-    vec3 t = 2.0 * cross(qv, v);
-    return v + qw * t + cross(qv, t);
 }

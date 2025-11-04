@@ -94,8 +94,8 @@ class Scene:
                 bitangent=[0, 1, 0],
                 u_min=-10,
                 u_max=10,
-                v_min=-10,
-                v_max=10,
+                v_min=-20,
+                v_max=20,
                 center=[0, 0, -3],
                 color=[
                     np.random.uniform(low=0.2, high=0.9),

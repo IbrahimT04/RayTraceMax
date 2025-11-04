@@ -104,7 +104,17 @@ layout(std430, binding = 6) readonly buffer Data {
 
 layout(rgba32f, binding = 7) uniform image2D reflection_input;
 
+uniform vec3 sun_pos = vec3(1000.0, -1600.0, 1000.0);
+uniform float sun_radius = 50.0;
+
 void trace(Ray ray, out RenderState renderState);
+
+bool sun_lit(Ray ray, vec3 normal);
+vec3 random_point_on_sphere(vec3 center, float radius);
+
+bool intersect(Ray ray, Sphere sphere, float tMin, float tMax);
+bool intersect(Ray ray, Triangle triangle, float tMin, float tMax);
+bool intersect(Ray ray, Plane plane, float tMin, float tMax);
 
 RenderState hit(Ray ray, Sphere sphere, float tMin, float tMax, RenderState renderstate);
 RenderState hit(Ray ray, Triangle triangle, float tMin, float tMax, RenderState renderstate);
@@ -131,20 +141,24 @@ void main() {
     ray.origin = viewer.position;
     ray.direction = viewer.forwards + horizontalCoefficient * viewer.right + verticalCoefficient * viewer.up;
 
-    // vec3 pixel = trace(ray);
     vec3 pixel = vec3(1.0);
-    // pixel = vec3(texture(skybox, ray.direction));
+    float lit = 1.0;
 
     RenderState renderState;
-    //renderState.diffuse = vec3(1.0);
     trace(ray, renderState);
     first_pass(ray, pixel, renderState);
     if (renderState.hit){
+        lit = float(sun_lit(ray, renderState.normal));
         next_pass(ray, pixel, renderState);
     }
+    else {
+        vec3 sky_text = vec3(texture(skybox, ray.direction));
+        pixel = pixel * sky_text;
+    }
+    lit = lit * 0.5 + 0.5;
+    pixel *= lit;
 
     ivec3 coord3 = ivec3(pixel_coords.x, pixel_coords.y, int(gl_GlobalInvocationID.z));
-    // imageStore(img_output, coord3, vec4(pixel * ray_input, 1.0));
     imageStore(img_output, coord3, vec4(pixel, 1.0));
 }
 
@@ -183,12 +197,138 @@ void trace(Ray ray, out RenderState renderState){
     renderState.in_vec = normalize(-ray.direction);
 }
 
-void first_pass(inout Ray ray, inout vec3 pixel, inout RenderState renderState){
-    if (!renderState.hit){
-        vec3 sky_text = vec3(texture(skybox, ray.direction));
-        pixel = pixel * sky_text;
+bool sun_lit(Ray ray, vec3 normal){
+
+    vec3 light_pos = random_point_on_sphere(sun_pos, sun_radius);
+
+    ray.direction = light_pos - ray.origin;
+
+    bool not_lit = true;
+    if (dot(normal, ray.direction) > 0.0){
+
+        for (int i = 0; i < sphere_count; i++){
+            not_lit = intersect(ray, spheres[i], 0.00001, 999.9);
+
+            if (not_lit){
+                return false;
+            }
+        }
+        for (int i = 0; i < triangle_count; i++){
+            not_lit = intersect(ray, triangles[i], 0.00001, 999.9);
+
+            if (not_lit){
+                return false;
+            }
+        }
+
+        for (int i = 0; i < plane_count; i++){
+            not_lit = intersect(ray, planes[i], 0.00001, 999.9);
+
+            if (not_lit){
+                return false;
+            }
+        }
+        return true;
     }
     else {
+        return false;
+    }
+}
+vec3 random_point_on_sphere(vec3 center, float radius){
+    PathSpreadVector planeSpread = paths[gl_GlobalInvocationID.z/2];
+    float u = planeSpread.x_val;
+    float v = planeSpread.y_val;
+    float phi = 2 * 3.1415 * u;
+    float z   = 2*v - 1;
+    float rho = sqrt(max(0.0, 1 - z*z));
+    float x = rho * cos(phi);
+    float y = rho * sin(phi);
+    return center + radius * vec3(x,y,z);
+}
+
+bool intersect(Ray ray, Sphere sphere, float tMin, float tMax){
+    vec3 dist = ray.origin - sphere.center;
+    float a = dot(ray.direction, ray.direction);
+    float b = 2.0 * dot(ray.direction, dist);
+    float c = dot(dist, dist) - sphere.radius * sphere.radius;
+
+    float discriminant = b * b - 4 * a * c;
+
+    if (discriminant > 0) {
+        float t = (-b - sqrt(discriminant)) / (2 * a);
+
+        if (t > tMin && t < tMax) {
+            return true;
+        }
+        else {
+            return false;
+        }
+    }
+    else {
+        return false;
+    }
+}
+bool intersect(Ray ray, Triangle triangle, float tMin, float tMax) {
+    vec3 e1 = triangle.v1position - triangle.v0position;
+    vec3 e2 = triangle.v2position - triangle.v0position;
+
+    vec3 p0 = cross(ray.direction, e2);
+    float det = dot(p0, e1);
+
+    if (det != 0.0) {
+
+        vec3 t0 = ray.origin - triangle.v0position;
+        vec3 q = cross(t0, e1);
+
+        float u = dot(t0, p0)/det;
+        float v = dot(q, ray.direction)/det;
+
+        float t = dot(e2, q)/det;
+
+        if (u >= 0 && v >= 0 && u + v <= 1 && t > tMin && t < tMax) {
+            return true;
+        }
+        else {
+            return false;
+        }
+    }
+    else {
+        return false;
+    }
+}
+bool intersect(Ray ray, Plane plane, float tMin, float tMax){
+    float denominator = dot(plane.normal, ray.direction);
+
+    if (abs(denominator) > 0.00001) {
+
+        float t = dot(plane.center - ray.origin, plane.normal) / denominator;
+
+        if (t > tMin && t < tMax) {
+
+            vec3 point = ray.origin + t * ray.direction;
+            vec3 plane_dir = point - plane.center;
+
+            float u_vec = dot(plane_dir, plane.tangent);
+            float v_vec = dot(plane_dir, plane.bitangent);
+
+            if (u_vec > plane.uMin && u_vec < plane.uMax && v_vec > plane.vMin && v_vec < plane.vMax) {
+                return true;
+            }
+            else {
+                return false;
+            }
+        }
+        else {
+            return false;
+        }
+    }
+    else {
+        return false;
+    }
+}
+
+void first_pass(inout Ray ray, inout vec3 pixel, inout RenderState renderState){
+    if (renderState.hit) {
         ray.origin = renderState.position;
         reflect_ray(ray, renderState);
         renderState.out_vec = normalize(ray.direction);
@@ -206,8 +346,6 @@ void next_pass(Ray ray, inout vec3 pixel, RenderState renderState){
         if (!renderState.hit){
             vec3 sky_text = vec3(texture(skybox, ray.direction));
             pixel = pixel * sky_text;
-            // pixel = pixel * (1/3.14159 * 10.0) * tan(3.14159 * (length(sky_text)/2)) * sky_text;
-            // pixel = pixel * sky_text * 1.0/5.0 * (pow(7, length(sky_text)) - 1) * sky_text;
             break;
         }
         else {
@@ -217,7 +355,6 @@ void next_pass(Ray ray, inout vec3 pixel, RenderState renderState){
             vec3 diffuse = (renderState.diffuse/3.1415) * dot(renderState.out_vec, renderState.normal);
             pixel = renderState.emissive +
             (((renderState.metallic) * ray_input + (1.0 - renderState.metallic) * pixel) * diffuse);
-            // pixel = renderState.emissive + (pixel * renderState.diffuse);
         }
     }
 }

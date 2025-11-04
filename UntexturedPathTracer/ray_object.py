@@ -5,7 +5,7 @@ from UntexturedPathTracer.lighting import Light
 from UntexturedPathTracer.game_object import DepthQuad
 from UntexturedPathTracer.skybox import Skybox
 from UntexturedPathTracer.utilities import calc_compute_shaders, get_textures
-from UntexturedPathTracer.samples128 import samples128, samples256, samples512, samples1024
+from UntexturedPathTracer.samples128 import samples
 
 class RayTracer:
     info = {}
@@ -23,7 +23,7 @@ class RayTracer:
         self.pathSpreadBuffer = None
         self.pathSpreadData = None
         # Path Spread
-        self.pathSpread = samples128
+        self.pathSpread = samples(128)
 
         self.triangleDataBuffer = None
         self.triangleData = None

@@ -9,6 +9,10 @@ def generate_random_coordinates_flat(n_points=128, seed=1):
     coords[0][1] = 0.0
     return coords.ravel()
 
+samples = lambda x: generate_random_coordinates_flat(n_points=x, seed=np.random.randint(1000))
+
+samples64 = generate_random_coordinates_flat(n_points=64, seed=2)
+
 samples128 = generate_random_coordinates_flat()
 # print(samples128.shape)
 # print(samples128.dtype)
