@@ -32,7 +32,7 @@ RayTraceMax/
 │   ├── main.py                 # Window loop and dispatch
 │   ├── ray_object.py           # SSBO setup, dispatch, draw quad
 │   └── shaders/                # raytracer.{vert,frag}, raytracer_test.comp.glsl
-├── LightRayTracer/             # Ray tracing + reflections + skybox
+├── LightRayTracer/             # Ray tracing + light sources
 │   ├── main.py
 │   ├── scene_renderer.py
 │   └── shaders/                # raytracer.comp.glsl, pass shaders
