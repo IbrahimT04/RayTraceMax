@@ -1,5 +1,10 @@
 # RayTraceMax
 
+<img width="1205" height="846" alt="Screenshot 2025-10-07 114646" src="https://github.com/user-attachments/assets/1ae454c6-65ac-45bd-8b49-8a8a3e23859c" />
+<img width="804" height="651" alt="Screenshot 2025-11-03 231305" src="https://github.com/user-attachments/assets/5fa98ef1-f13b-4fef-8ffa-81b65bc518e7" />
+<img width="1196" height="837" alt="Screenshot 2025-10-19 125422" src="https://github.com/user-attachments/assets/0916d552-2e76-4593-acf0-85cdfd2f3fe8" />
+
+
 A compute‑shader PBR renderer that experiments with **real‑time ray tracing** and **stochastic path tracing** in **GLSL 4.6**, driven from Python via **PyOpenGL** and **GLFW**. The project explores a **compute shader pipeline** that writes directly to storage images, with geometry and materials streamed to the GPU through SSBOs.
 
 > **Subprojects**
