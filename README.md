@@ -8,8 +8,8 @@
 A compute‑shader PBR renderer that experiments with **real‑time ray tracing** and **stochastic path tracing** in **GLSL 4.6**, driven from Python via **PyOpenGL** and **GLFW**. The project explores a **compute shader pipeline** that writes directly to storage images, with geometry and materials streamed to the GPU through SSBOs.
 
 > **Subprojects**
-> - **SimpleRayTracer/** – minimal ray tracer (spheres/planes/triangles) used for debugging and feature bring‑up.
-> - **LightRayTracer/** – ray tracing with skybox and reflective shading.
+> - **SimpleRayTracer/** – minimal ray tracer (spheres/planes/triangles) with skybox and reflective shading.
+> - **LightRayTracer/** – ray tracing added light sources.
 > - **UntexturedPathTracer/** – multi‑bounce path tracer (metallic/roughness PBR, skybox IBL, precomputed sample sets).
 
 Apache 2.0 licensed (see `LICENSE`).
